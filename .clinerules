@@ -1,0 +1,462 @@
+﻿# .clinerules — Moa Tradecenter
+
+> ⚠️ **ADVERTENCIA CRÍTICA PARA CLINE:**
+> Este proyecto se desarrolla EXCLUSIVAMENTE en **Windows usando PowerShell**.
+> **ESTÁ TOTALMENTE PROHIBIDO** usar comandos de Linux/macOS (ej. `ls`, `rm`, `cp`, `mv`, `export`, `cat`, `touch`, `&&`).
+> Cline DEBE usar comandos nativos de PowerShell (ej. `dir`, `Remove-Item`, `Copy-Item`, `Move-Item`, `$env:VAR`, `Get-Content`, `New-Item`, `;`).
+> Si Cline usa un comando de Linux, fallará y hará perder tiempo al usuario.
+
+> Reglas obligatorias del proyecto. Cline DEBE leer este archivo al inicio de cada
+> tarea y respetar TODAS las reglas aquí descritas. Si una petición del usuario
+> entra en conflicto con estas reglas, Cline debe señalarlo antes de actuar.
+>
+> Versión: 5.1
+> Última actualización: Corrección de identidad visual y reglas de PowerShell.
+
+---
+
+## 1. Identidad del proyecto
+
+- **Nombre oficial:** Moa Tradecenter
+- **Propósito:** Directorio comercial local del municipio de Moa (Cuba). Permite
+  a cualquier persona encontrar productos y servicios ofrecidos dentro del
+  municipio, contactar al vendedor y solicitar domicilio cuando el producto lo
+  permita.
+- **Alcance geográfico:** Municipio de Moa exclusivamente (por ahora).
+- **Idioma de la interfaz y del código:** Español (UI, textos, mensajes de error,
+  nombres de variables de dominio cuando aplique). El código técnico (funciones,
+  clases, tablas) puede estar en inglés si es estándar.
+- **Idioma de los documentos:** Español.
+- **Repositorio:** `moa-tradecenter` (monorepo con `frontend/` y `backend/`).
+
+---
+
+## 2. Documentos fuente de verdad
+
+Cline NO debe inventar reglas de negocio. Las reglas viven en `/docs` y este
+archivo las resume. Orden de prioridad en caso de conflicto:
+
+1. `.clinerules` (este archivo)
+2. `/docs/03-reglas-de-negocio.md`
+3. `/docs/04-modelo-de-datos.md`
+4. `/docs/05-flujos.md`
+5. Resto de documentos
+
+Si algo no está documentado, Cline debe **preguntar antes de asumir**.
+
+---
+
+## 3. Roles del sistema (no negociables)
+
+Existen exactamente estos roles. No se deben fusionar ni renombrar sin
+autorización:
+
+1. **Visitante** — navega el sitio sin cuenta. Puede ver productos y servicios,
+   aplicar filtros y usar el buscador. No puede enviar mensajes ni solicitar
+   domicilio sin identificarse con su WhatsApp.
+2. **Comprador** — cualquier persona que, desde el sitio, envía un mensaje a un
+   vendedor o solicita un domicilio. Para ello **debe proporcionar su número de
+   WhatsApp**. No requiere registro completo ni cuenta persistente.
+3. **Vendedor** — usuario registrado con `rol: 'vendedor'`. Puede ser de
+   productos, de servicios, o **ambos a la vez**. Si además ofrece domicilio,
+   tiene `esPrestador: true`.
+4. **Prestador de Domicilio** — **no es un rol separado**. Es un Vendedor de
+   Servicios con `esPrestador: true`. Su WhatsApp es el único público del sitio.
+5. **Administrador** — `rol: 'admin'`. Único con acceso al panel admin.
+
+---
+
+## 4. Acceso y autenticación
+
+- El sitio es **público para navegar**. Cualquiera puede ver productos y
+  servicios sin cuenta.
+- El botón "Login o acceder" abre un panel de acceso con:
+  - **Acceso mágico (OAuth) con Google o Facebook**, **simulado** en el MVP.
+  - **Verificación anti-bots** representada como un checkbox "No soy un robot",
+    **obligatorio** y **simulado** en el MVP.
+- **No existe contraseña**, por lo tanto **no existe "cambiar contraseña"**.
+- Existe un enlace a **"Registrarse"** para quien quiera ser vendedor.
+- Al pulsar Google/Facebook se muestra un modal de **simulación** que permite
+  elegir un usuario de prueba (comprador / vendedor / admin) para probar
+  distintos roles.
+- En fase 2 se reemplaza por OAuth real y captcha real.
+
+---
+
+## 5. Mensajería interna (regla crítica)
+
+- El contacto entre comprador y vendedor es por **mensajería interna del sitio**.
+- **No existen botones de llamada, SMS, WhatsApp ni Facebook como canales de
+  contacto hacia el vendedor.** El WhatsApp solo se usa como dato del comprador
+  para que el vendedor le responda fuera del sitio.
+- Para enviar un mensaje, el comprador **debe proporcionar su número de
+  WhatsApp**. Sin ese dato no se puede iniciar la conversación.
+- El vendedor responde **por WhatsApp al número que dejó el comprador**. La
+  mensajería interna sirve para que el comprador envíe su consulta y su número;
+  la conversación real continúa por WhatsApp para no congestionar la página.
+- El número de WhatsApp del comprador **no es público**. Solo lo ve el vendedor
+  destinatario del mensaje.
+- El número de WhatsApp del vendedor **no se expone** (salvo el del prestador de
+  domicilio, ver sección 6).
+- **Límite de mensajes:** máximo 20 mensajes por comprador/día, contados por
+  número de WhatsApp (cambiar de WhatsApp resetea el contador en MVP).
+- Los mensajes **no leídos** se **borran físicamente** a los **5 días** con TTL
+  index de MongoDB.
+- Los mensajes leídos conservan su contenido, pero el WhatsApp del comprador se
+  **anonimiza a los 30 días** con un job programado (no TTL).
+- El campo `tipo` del mensaje (`producto` o `servicio`) se deriva al crear y se
+  usa para filtrar en la bandeja del vendedor con tipo "ambos".
+
+---
+
+## 6. Reglas de privacidad (CRÍTICAS — no romper nunca)
+
+- **El WhatsApp del comprador NUNCA es visible públicamente.** Solo lo recibe el
+  vendedor destinatario del mensaje (o el prestador, en el caso del domicilio).
+- **El WhatsApp del vendedor de productos o servicios no-domicilio NUNCA se
+  expone en el sitio.**
+- **Excepción deliberada:** el WhatsApp del **prestador de domicilio** es
+  público, porque forma parte del servicio. Se expone solo si
+  `whatsappEsPublico === true`. Es el **único WhatsApp público del sitio**.
+- **La dirección del vendedor NUNCA es visible por defecto.** Solo se comparte
+  con el prestador de domicilio cuando el comprador solicita domicilio.
+- **La dirección es opcional** para el vendedor de productos. Si no la aporta,
+  se entiende que **no acepta domicilio** y el botón "Domicilio" debe informarlo
+  claramente.
+- **`aceptaDomicilio` es el checkbox explícito.** Si es `true`, `direccion` es
+  obligatoria. Si es `false`, `direccion` debe ser `null`. El campo
+  `tieneDomicilio` del producto se deriva de `aceptaDomicilio`.
+- **Un prestador no acepta domicilio (lo ofrece).** No tiene
+  `aceptaDomicilio` ni `direccion`. Tiene `esPrestador: true`, `whatsapp`
+  (público), `tarifaDomicilio` y `disponible`.
+- Ningún endpoint público debe devolver WhatsApp ni direcciones en crudo, salvo
+  el WhatsApp del prestador de domicilio (que sí es público por diseño).
+- Cada acceso del admin a un dato privado **queda auditado** (quién, qué dato,
+  a qué vendedor, cuándo) y es visible en la pestaña "Auditoría".
+
+---
+
+## 7. Reglas de productos
+
+- Todo producto pertenece a **una** categoría y a **un** tipo de venta:
+  `minorista` o `mayorista`. No puede ser ambos a la vez en el MVP.
+- Si el producto es `mayorista`: `precioMayorista` obligatorio (mayor que 0).
+  No se muestra precio minorista.
+- Si el producto es `minorista`: `precio` obligatorio (mayor que 0). No se
+  muestra precio por cantidad.
+- La **imagen es opcional**. Se acepta una URL externa. Validación de tipo MIME
+  y tamaño máximo 5 MB en el frontend. Storage propio en fase 2.
+- **Tener dirección = aceptar domicilio** (ver sección 6).
+- Un producto solo muestra el botón "Domicilio" si su vendedor tiene
+  `aceptaDomicilio: true` y dirección registrada.
+- Si el producto no tiene domicilio, el botón debe estar presente pero
+  **informar claramente** que ese producto no tiene domicilio, y ofrecer el
+  botón "Mensaje" como alternativa.
+- **No hay límite** de productos por vendedor en el MVP.
+- Un producto **no puede publicarse** sin nombre, sin precio (> 0) y sin
+  categoría.
+- **Precios siempre en centavos enteros.** No se admiten decimales más pequeños
+  que 1 centavo.
+- Un producto **no puede tener `precio` y `precioMayorista` a la vez**. Solo uno
+  según su `tipoVenta`.
+
+---
+
+## 8. Reglas de servicios
+
+- Todo servicio pertenece a **una** categoría de servicio.
+- Los servicios **no tienen minorista/mayorista**.
+- Los servicios **tienen precio fijo obligatorio** en el MVP (mayor que 0).
+- Los servicios **no tienen botón "Domicilio"**. Solo tienen botón "Mensaje".
+- **No hay límite** de servicios por vendedor en el MVP.
+- Un servicio **no puede publicarse** sin nombre, sin precio (> 0) y sin
+  categoría.
+- Si el vendedor es suspendido, sus servicios se ocultan del sitio público.
+- Si el servicio pertenece a la categoría "Domicilio", el vendedor asociado
+  **debe** tener `esPrestador: true`, `whatsapp`, `whatsappEsPublico: true` y
+  `tarifaDomicilio`.
+
+---
+
+## 9. Reglas de domicilio
+
+- Solo los vendedores de servicios con categoría **"Domicilio"** y
+  `esPrestador: true` pueden recibir solicitudes de domicilio.
+- Un prestador **debe registrarse** y proporcionar su WhatsApp para poder
+  recibir solicitudes.
+- Un prestador **debe indicar su tarifa** de cobro por el servicio.
+- La tarifa es **fija por prestador** en el MVP.
+- Puede haber **varios prestadores** disponibles para un mismo producto. El
+  comprador elige entre los que estén en `disponible = true`.
+- El flujo de solicitud de domicilio tiene exactamente **2 pasos**:
+  1. Elegir prestador de la lista (nombre, tarifa y WhatsApp).
+  2. Confirmar. Al confirmar, el sistema **envía automáticamente un mensaje** al
+     prestador con: datos del producto, dirección del vendedor y WhatsApp del comprador.
+- El prestador **contacta al comprador por WhatsApp** para confirmar compra y
+  dirección de entrega. La dirección de entrega **no se pide en el sitio**.
+- Estados de una solicitud: `pendiente`, `contactado`, `entregado`, `cancelado`.
+- Un prestador puede **pausar la recepción** de solicitudes con
+  `disponible = false`, sin que eso cuente como suspensión.
+- Si el admin **suspende** a un prestador:
+  - sus solicitudes `pendiente` y `contactado` **se cancelan**,
+  - el sistema **avisa al comprador por WhatsApp** de que debe elegir otro
+    prestador,
+  - el prestador deja de aparecer en el selector aunque `disponible = true`.
+- Al reactivar a un prestador, `disponible` **se respeta** como estaba antes de
+  la suspensión.
+- El **snapshot** de la solicitud (producto y dirección del vendedor)
+  **prevalece** sobre las referencias. Si el producto o el vendedor se eliminan,
+  la solicitud conserva el snapshot congelado.
+
+---
+
+## 10. Reglas de registro de vendedor
+
+- Para registrarse, el usuario debe aportar:
+  - **Nick** (obligatorio, **único** en el sistema),
+  - **Dirección** — solo si marca "Si desea recibir domicilio". En ese caso, la
+    dirección pasa a ser **obligatoria**.
+  - **Tipo de venta**: productos, servicios o ambos (obligatorio).
+  - Si el tipo de venta es **servicios** y la categoría principal es
+    **"Domicilio"**, el sistema marca automáticamente `esPrestador: true` y
+    exige **WhatsApp** y **tarifa**.
+- El tipo de venta **queda fijo** al registrarse y **no se puede cambiar**
+  después. **No aparece** en el formulario de edición de perfil.
+- El registro se hace con OAuth simulado + checkbox anti-bots obligatorio.
+- El vendedor **puede editar** después: nick, dirección, "si desea recibir
+  domicilio". No puede editar el tipo de venta.
+- El cambio de nick **se permite** si el nuevo nick no existe. Error si ya
+  existe.
+- **Un prestador no puede marcar "Si desea recibir domicilio".** Su dirección
+  no se guarda. Su WhatsApp es público y su tarifa es obligatoria.
+- **El vendedor puede eliminar su propia cuenta** con todos sus productos,
+  servicios y mensajes. La cuenta queda marcada como `eliminada` (soft delete).
+- El registro crea el vendedor en estado `activo` en MVP (no hay moderación
+  previa; el admin puede suspender después).
+
+---
+
+## 11. Reglas de categorías
+
+- Las categorías existen **para productos y para servicios** por separado.
+- **Solo el admin** puede crear, editar o eliminar categorías.
+- Cada categoría tiene **nombre e icono**. El nombre es único dentro de su tipo.
+- El **icono es un solo emoji** validado con longitud máxima de 2 caracteres.
+- El campo `orden` es un **entero libre**, orden ascendente. Si hay empate, se
+  ordena por `nombre`.
+- Existe **una** categoría "Sin categoría" por tipo, creada por defecto, **no
+  editable ni eliminable**.
+- Al eliminar una categoría, sus productos/servicios se **reasignan
+  automáticamente** a "Sin categoría" del mismo tipo. **No se bloquea la
+  eliminación.** Se avisa al admin cuántos productos/servicios se movieron.
+- Los productos/servicios en "Sin categoría" **no se muestran en el listado
+  público** hasta que el admin los reubique.
+
+---
+
+## 12. Reglas del panel del vendedor
+
+El panel del vendedor debe permitirle como mínimo:
+
+- **Bandeja de mensajes**: ver los mensajes de compradores con el WhatsApp del
+  comprador, el producto/servicio consultado y el texto. Filtrar por `tipo`
+  (`producto` o `servicio`) si vende ambos. Marcar como leído. Abrir WhatsApp
+  del comprador para responder.
+- **Administrar sus productos o servicios**: crear, editar, eliminar.
+- **Información general de sus ventas**: productos activos, mensajes recibidos
+  (total y últimos 7 días), solicitudes de domicilio recibidas, productos más
+  consultados y más buscados.
+- **Editar perfil**: nick, dirección, "si desea recibir domicilio". El tipo de
+  venta **no aparece** en el formulario.
+- **Eliminar cuenta** con confirmación por nick.
+- **Si es prestador**: switch de `disponible` para pausar recepción de
+  solicitudes.
+- **Mensajería interna con el admin**: recibir y **solo responder** (no
+  iniciar).
+
+---
+
+## 13. Reglas del panel de administrador
+
+- Solo el rol Administrador accede. En MVP es un usuario fijo por configuración.
+- Debe mostrar como mínimo:
+  - visitas totales al sitio,
+  - listado de vendedores con tipo, categoría, interacciones y estado,
+  - contadores de productos/servicios activos y de mensajes generados,
+  - pestaña "Auditoría" con registro de accesos a datos privados.
+- Puede **suspender** y **reactivar** cuentas.
+- Puede **eliminar productos prohibidos** con motivo.
+- Puede **crear, eliminar y reasignar categorías**.
+- Puede **enviar mensajes internos** a vendedores/prestadores (a uno, a todos o
+  a un grupo filtrado por tipo).
+- Puede **ver WhatsApp y dirección** de un vendedor solo en su ficha individual
+  y con auditoría.
+- Puede **ver el WhatsApp del reportante** en un reporte, pero **no contactarlo
+  directamente** desde el panel. Solo para auditoría.
+- **No puede** actuar como comprador en nombre de otro usuario.
+- **No puede** ver el WhatsApp de un comprador.
+- **No puede** modificar el tipo de venta de un vendedor ya registrado.
+
+---
+
+## 14. Reglas de navegación del comprador
+
+1. Entra al sitio (sin cuenta).
+2. **Filtra primero: producto o servicio.**
+3. Dentro de esa elección puede aplicar **filtros secundarios**: precio, tipo de
+   producto (mayorista o minorista), más recientes, más buscados.
+4. Usa el **buscador** dentro de esa elección.
+5. Al abrir un producto o servicio, ve: nombre, descripción, precio.
+6. Acciones disponibles:
+   - **Producto con domicilio:** botón "Domicilio" y botón "Mensaje".
+   - **Producto sin domicilio:** botón "Domicilio" deshabilitado con mensaje
+     informativo, y botón "Mensaje".
+   - **Servicio:** solo botón "Mensaje".
+7. Para usar "Mensaje" o "Domicilio", el comprador **debe proporcionar su
+   número de WhatsApp**.
+8. El comprador puede **reportar** un producto/servicio/vendedor sin cuenta.
+
+---
+
+## 15. Reglas de reportes
+
+- Cualquier visitante o comprador puede reportar un producto, servicio o
+  vendedor sin necesidad de cuenta.
+- El reporte tiene motivo obligatorio (contenido inapropiado, precio engañoso,
+  producto prohibido, otro), comentario opcional y WhatsApp opcional.
+- El admin puede **desestimar** o **actuar** sobre el reporte.
+- El WhatsApp del reportante solo lo ve el admin, nunca terceros, y **no se usa
+  para contactarlo desde el panel**. Solo para auditoría.
+
+---
+
+## 16. Reglas técnicas obligatorias
+
+- **Stack:**
+  - Frontend: **React + Vite + TypeScript + Tailwind CSS**.
+  - Backend: **NestJS + TypeScript + Mongoose**.
+  - Base de datos: **MongoDB** (Atlas).
+  - Validaciones: **Zod** (frontend y backend).
+  - Autenticación: **JWT** (OAuth simulado en MVP).
+  - Despliegue: **Vercel** (frontend y backend como dos proyectos del monorepo).
+- **Monorepo:** `moa-tradecenter/` con `frontend/` y `backend/`.
+- **Mobile-first.** Toda pantalla debe diseñarse primero para móvil y luego
+  escalar.
+- **Preparado para app:** componentes reutilizables y modelo de datos
+  independiente de la web (API-first). No acoplar lógica de negocio al HTML.
+- **Un solo idioma de UI:** español.
+- **Accesibilidad mínima:** contraste AA, tamaños táctiles ≥ 44px, labels en
+  inputs, foco visible, navegación por teclado en modales.
+- **Sin datos falsos hardcodeados en producción.** Los datos de ejemplo van en
+  seeds/mocks separados y marcados.
+- **No introducir dependencias nuevas** sin autorización explícita.
+- **No cambiar el stack** sin autorización.
+- **No crear archivos nuevos** fuera de la estructura acordada sin justificarlo.
+- **No renombrar** entidades, campos ni categorías ya definidas en `/docs`.
+- Toda funcionalidad nueva debe ir acompañada de su actualización en `/docs`.
+- Las integraciones con Google, Facebook y el anti-bots son **simuladas** en el
+  MVP. Cualquier implementación real requiere autorización explícita.
+- **Zona horaria:** almacenamiento en UTC, UI en **UTC-5 fijo** (Cuba, sin DST
+  en el MVP).
+- **TTL de mensajes:** los no leídos se borran físicamente a los 5 días con TTL
+  index de MongoDB. Los leídos se anonimizan a los 30 días con job programado.
+- **Terminal en Windows (PowerShell) - OBLIGATORIO:** Cline DEBE usar SIEMPRE la sintaxis nativa de PowerShell. **NUNCA usar `&&`** (usar `;` en su lugar). **NUNCA usar comandos de Linux** como `ls`, `rm`, `cp`, `mv`, `cat`, `touch`, `export`. Ejemplo correcto: `cd frontend ; npm run dev` o `Remove-Item archivo.txt`.
+
+---
+
+## 17. Convenciones de código
+
+- Nombres de dominio en español cuando representen conceptos del negocio
+  (`vendedor`, `producto`, `servicio`, `solicitudDomicilio`, `mensaje`).
+- Nombres técnicos en inglés cuando sean estándar (`id`, `createdAt`,
+  `updatedAt`, `isActive`).
+- IDs: **ObjectId de MongoDB**.
+- Fechas: ISO 8601 en almacenamiento (UTC), formato local UTC-5 en UI.
+- Dinero: **entero en centavos**. Moneda del MVP: **CUP**. Sin decimales más
+  pequeños que 1 centavo.
+- Validaciones: Zod en frontend y backend. Nunca confiar solo en el frontend.
+- Errores: mensajes claros en español, sin exponer detalles técnicos.
+- WhatsApp del comprador: validar formato cubano (`+53 5XXXXXXX`).
+
+---
+
+## 18. Convenciones de UI
+
+- **Paleta base (identidad de Moa):**
+  - Rojo Laterita `#A63A2B` (primario).
+  - Rojo Profundo `#7A2A1F` (hover).
+  - Verde Níquel `#4A7C59` (secundario).
+  - Azul Caribe `#2E6B8A` (acento).
+  - Arena Mineral `#F5F0E8` (fondo).
+  - Blanco Puro `#FFFFFF` (superficie).
+  - Gris Hierro `#2C2C2C` (texto principal).
+  - Gris Ceniza `#6B6B6B` (texto secundario).
+  - Gris Piedra `#D9D4CC` (bordes).
+  - Los detalles completos están en `docs/09-design-system.md`.
+- Tipografía: **Inter** o **Manrope** (sans-serif geométrica).
+- Iconografía: **Lucide React**, lineal y consistente.
+- Componentes reutilizables mínimos: tarjeta, badge, botón, modal, input con
+  label y error, tabla.
+- Estados obligatorios en cada componente interactivo: `default`, `hover`,
+  `focus`, `active`, `disabled`, `loading`, `empty`, `error`.
+- Los modales deben cerrarse con `Esc` y con clic fuera.
+- El botón "Domicilio" deshabilitado debe explicar visualmente **por qué** está
+  deshabilitado.
+
+---
+
+## 19. Prohibiciones explícitas
+
+Cline NO debe:
+
+- Exponer números de WhatsApp ni direcciones en el HTML por defecto, salvo el
+  WhatsApp del prestador de domicilio (con `whatsappEsPublico === true`).
+- Reintroducir botones de llamada, SMS, WhatsApp o Facebook como canales de
+  contacto hacia el vendedor.
+- Fusionar roles ni crear roles nuevos sin autorización.
+- Usar `rol: 'prestador'`. El prestador es `rol: 'vendedor'` + `esPrestador: true`.
+- Añadir campos, categorías o tipos de venta no documentados.
+- Cambiar el flujo de domicilio de 2 pasos sin autorización.
+- Pedir la dirección de entrega del comprador en el sitio (se coordina por
+  WhatsApp).
+- Introducir frameworks, librerías o servicios externos sin autorización.
+- Crear endpoints públicos que devuelvan datos privados.
+- Implementar OAuth real ni captcha real en el MVP (van simulados).
+- Implementar la geolocalización del domiciliario antes de la Fase 5.
+- Usar TTL index para mensajes leídos (solo para no leídos).
+- Bloquear la eliminación de categorías con productos (se reasignan
+  automáticamente a "Sin categoría").
+- Permitir que un vendedor inicie mensajes internos al admin (solo responde).
+- Modificar `/docs` sin avisar qué documento y por qué.
+- Generar código sin haber leído antes los documentos relevantes de `/docs`.
+- Asumir reglas de negocio no documentadas: si falta información, **preguntar**.
+
+---
+
+## 20. Flujo de trabajo esperado con Cline
+
+Antes de implementar cualquier tarea, Cline debe:
+
+1. Leer `.clinerules` y los documentos de `/docs` relevantes a la tarea.
+2. Confirmar en una frase qué va a hacer y qué documentos ha consultado.
+3. Señalar cualquier ambigüedad o conflicto con las reglas.
+4. Esperar confirmación si la tarea toca reglas de negocio, privacidad o modelo
+   de datos.
+5. Implementar.
+6. Actualizar `/docs` si la tarea introdujo o modificó una regla.
+7. Resumir al final: qué cambió, qué documentos se actualizaron y qué quedó
+   pendiente.
+
+---
+
+## 21. Definición de "terminado"
+
+Una tarea se considera terminada solo si:
+
+- Cumple todas las reglas de este archivo.
+- Respeta las reglas de privacidad (sección 6).
+- Está documentada en `/docs` si introdujo o cambió una regla.
+- Funciona en móvil y en desktop.
+- Tiene estados `empty`, `loading` y `error` donde aplique.
+- No introduce datos falsos fuera de seeds/mocks.
+- Está desplegada en Vercel (preview al menos).

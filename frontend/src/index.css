@@ -1,0 +1,112 @@
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fondo abstracto de laterita/mineral con CSS */
+.bg-laterita-abstracta {
+  background-color: #8B3A2B;
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
+    repeating-linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.05) 0px,
+      rgba(0, 0, 0, 0.05) 2px,
+      transparent 2px,
+      transparent 6px
+    ),
+    radial-gradient(circle at 80% 80%, rgba(166, 58, 43, 0.6) 0%, transparent 40%);
+  background-size: cover;
+  background-position: center;
+}
+
+/* =========================================================
+   SCROLLBAR GENERAL (ROJO MARCA)
+   ========================================================= */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #A63A2B transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #A63A2B;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #7A2A1F;
+}
+
+::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* =========================================================
+   SCROLLBAR AZUL (SOLO PARA ELEMENTOS CON LA CLASE .scroll-azul)
+   ========================================================= */
+.scroll-azul {
+  scrollbar-width: thin;
+  scrollbar-color: #2E6B8A transparent;
+}
+
+/* Forzamos la especificidad usando el padre y el elemento */
+.scroll-azul::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-azul::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Al usar !important, nos aseguramos de que gane sobre la regla general roja */
+.scroll-azul::-webkit-scrollbar-thumb {
+  background-color: #2E6B8A !important;
+  border-radius: 10px;
+  border: none;
+  background-clip: border-box;
+}
+
+.scroll-azul::-webkit-scrollbar-thumb:hover {
+  background-color: #1F4B61 !important;
+}
+
+/* MAPAS (Leaflet) */
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+  z-index: 1 !important;
+}
+
+.leaflet-control {
+  z-index: 2 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 2 !important;
+}
