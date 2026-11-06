@@ -1,5 +1,6 @@
 ﻿import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ConfigModule, ConfigService } from '@nestjs/config'; // <-- Agregamos ConfigService
 import { AuthModule } from './auth/auth.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { CategoriasModule } from './categorias/categorias.module';
@@ -12,12 +13,18 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
 import { AdminModule } from './admin/admin.module';
 import { EventosModule } from './eventos/eventos.module';
 import { DireccionesModule } from './direcciones/direcciones.module';
-import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    MongooseModule.forRoot('mongodb://localhost:27017/moa-tradecenter'), // Ajusta si usas Atlas
+    // 🔥 CAMBIO CLAVE: Usar forRootAsync para leer la variable de entorno
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        uri: configService.get<string>('MONGO_URI') || 'mongodb://localhost:27017/moa-tradecenter',
+      }),
+    }),
     AuthModule,
     UsuariosModule,
     CategoriasModule,
