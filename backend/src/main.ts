@@ -22,11 +22,16 @@ async function bootstrap() {
 
     app.useGlobalPipes(new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false, transform: true }));
     
-    const port = Number(process.env.PORT ?? 3000);
-    await app.listen(port, '0.0.0.0'); 
-    console.log(`Backend running on port ${port}`);
+    // En Vercel (producción), la app se inicializa a través de api/index.ts.
+    // En local (desarrollo), levantamos el servidor en el puerto 3000.
+    if (process.env.NODE_ENV !== 'production') {
+      const port = Number(process.env.PORT ?? 3000);
+      await app.listen(port, '0.0.0.0');
+      console.log(`🚀 Backend running locally on port ${port}`);
+    }
+    
   } catch (error) {
-    // 🔥 ESTO ES CLAVE: Imprime el error real en los logs de Vercel
+    // Imprime el error real en los logs de Vercel si algo falla al iniciar
     console.error('❌ ERROR FATAL AL INICIAR LA APP:', error);
     process.exit(1);
   }
