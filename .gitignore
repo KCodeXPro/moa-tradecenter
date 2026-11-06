@@ -1,7 +1,17 @@
 node_modules/
 dist/
+build/
 .env
+.env.*
 .DS_Store
 *.log
 temp-skills/
 .prisma/
+
+# Build artifacts / TS
+*.tsbuildinfo
+
+# Archivos de errores temporales del backend
+backend/compile_errors.txt
+backend/errors.txt
+backend/typescript_errors.txt
