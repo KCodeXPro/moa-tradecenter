@@ -16,7 +16,7 @@ interface Props {
   servicio: any | null;
   onClose: () => void;
   tema?: 'azul' | 'coral' | 'verde';
-  vistaInicial?: 'detalle' | 'contacto' | 'domicilio'; // 🔥 Agregado 'domicilio'
+  vistaInicial?: 'detalle' | 'contacto' | 'domicilio';
 }
 
 export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaInicial = 'detalle' }: Props) {
@@ -26,7 +26,7 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   
-  // 🔥 Estados para el flujo de domicilio
+  // Estados para el flujo de domicilio
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<Prestador | null>(null);
   const [prestadoresCargando, setPrestadoresCargando] = useState(false);
@@ -245,7 +245,7 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
             </div>
           )}
 
-          {/* 🔥 FLUJO DE DOMICILIO DENTRO DEL MODAL */}
+          {/* FLUJO DE DOMICILIO DENTRO DEL MODAL */}
           {vista === 'domicilio' && (
             <div className="space-y-3">
               <h3 className="text-base font-bold text-[#2C2C2C]">🛵 Solicitar domicilio</h3>
@@ -301,14 +301,16 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
         {/* Footer fijo (Botones de Contacto) */}
         <div className="p-6 border-t border-[#D9D4CC] flex-shrink-0 bg-white rounded-b-[20px]">
           {vista === 'detalle' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid ${tema !== 'coral' && servicio.esDomicilio ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
               <button
                 onClick={abrirContacto}
                 className={`w-full flex items-center justify-center gap-2 text-white py-3 rounded-[10px] font-bold transition-colors ${themeColors.button}`}
               >
                 💬 Mensaje
               </button>
-              {servicio.esDomicilio && (
+              
+              {/* 🔥 Solo mostramos Domicilio si NO es coral (prestadores) y si el servicio lo ofrece */}
+              {tema !== 'coral' && servicio.esDomicilio && (
                 <button
                   onClick={abrirDomicilio}
                   className="w-full flex items-center justify-center gap-2 bg-[#F97316] hover:bg-[#EA580C] text-white py-3 rounded-[10px] font-bold transition-colors"

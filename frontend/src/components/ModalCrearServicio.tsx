@@ -187,13 +187,21 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
 
             {!formData.esDivisa && (
               <>
-                <div>
-                  <label className="block text-sm font-bold text-[#2C2C2C] mb-1">¿Ofreces Domicilio?</label>
-                  <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                    <input type="checkbox" name="esDomicilio" checked={formData.esDomicilio} onChange={handleChange} className="w-4 h-4 accent-[#4A7C59]" />
-                    <span className="text-sm text-[#6B6B6B]">Sí, servicio a domicilio</span>
-                  </label>
-                </div>
+                <div className="md:col-span-2">
+  <label className="flex items-start gap-3 cursor-pointer p-3 border border-[#D9D4CC] rounded-[8px] hover:bg-gray-50 transition-colors">
+    <input 
+      type="checkbox" 
+      name="esDomicilio" 
+      checked={formData.esDomicilio} 
+      onChange={handleChange} 
+      className="w-5 h-5 mt-0.5 accent-[#4A7C59]" 
+    />
+    <div className="flex flex-col">
+      <span className="text-sm font-bold text-[#2C2C2C]">¿Tu negocio ofrece entrega a domicilio?</span>
+      <span className="text-xs text-[#6B6B6B]">Marca aquí si envías tus productos o realizas el servicio en la casa del cliente.</span>
+    </div>
+  </label>
+</div>
 
                 {/* 🔥 CAMPO DE WHATSAPP CON EL COMPONENTE INPUTWHATSAPP */}
                 <div>
