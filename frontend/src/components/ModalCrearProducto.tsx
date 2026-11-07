@@ -1,6 +1,8 @@
 ﻿import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -92,10 +94,9 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (variantes.length === 0) {
-      alert("Debes añadir al menos una variante (color, talla y cantidad).");
-      return;
-    }
+    
+    // 🔥 Se eliminó la validación que exigía variantes obligatorias.
+
     if (!usuario || !usuario.whatsapp) {
       alert("Por favor, completa tu perfil con tu WhatsApp antes de publicar un producto.");
       return;
@@ -105,14 +106,22 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
     try {
       const vendedorId = usuario._id; 
       const payload = {
-        nombre, descripcion, precio: parseInt(precio) * 100, tipoVenta, categoriaId, vendedorId, variantes,
-        tieneDomicilio: true, imagenes: imagenesBase64, whatsapp: usuario.whatsapp
+        nombre, 
+        descripcion, 
+        precio: parseInt(precio) * 100, 
+        tipoVenta, 
+        categoriaId, 
+        vendedorId, 
+        variantes, 
+        tieneDomicilio: true, 
+        imagenes: imagenesBase64, 
+        whatsapp: usuario.whatsapp
       };
 
       if (productoAEditar) {
-        await axios.put(`/api/productos/${productoAEditar._id}`, payload);
+        await axios.put(`${API_URL}/productos/${productoAEditar._id}`, payload);
       } else {
-        await axios.post('/api/productos', payload);
+        await axios.post(`${API_URL}/productos`, payload);
       }
       
       onCreated();
@@ -127,12 +136,10 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
 
   return (
     <div className="fixed inset-0 bg-[#2C2C2C]/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
-      {/* 🔥 CONTENEDOR PRINCIPAL CON FLEX COL Y ALTURA MÁXIMA */}
       <div 
         className="bg-white rounded-[20px] max-w-xl w-full max-h-[90vh] flex flex-col shadow-[0_10px_40px_rgba(0,0,0,0.2)] relative" 
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 🔥 CABECERA FIJA (FUERA DEL SCROLL) */}
         <div className="p-6 border-b border-[#D9D4CC] flex justify-between items-center flex-shrink-0">
           <h2 className="text-2xl font-extrabold text-[#2C2C2C]">
             {productoAEditar ? 'Editar Producto' : 'Añadir Producto'}
@@ -140,7 +147,6 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
           <button onClick={onClose} className="text-[#6B6B6B] hover:text-[#2C2C2C] font-bold text-xl">✕</button>
         </div>
         
-        {/* 🔥 FORMULARIO CON SCROLL INTERNO */}
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -158,7 +164,7 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
           </div>
 
           <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-[10px] border border-[#D9D4CC]">
-            <h3 className="font-bold text-[#2C2C2C] mb-3">Variantes del producto</h3>
+            <h3 className="font-bold text-[#2C2C2C] mb-3">Variantes del producto (Opcional)</h3>
             
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div>
@@ -208,7 +214,7 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
                   <button type="button" onClick={() => removeVariante(i)} className="text-[#B83A2E] font-bold">✕</button>
                 </div>
               ))}
-              {variantes.length === 0 && <span className="text-xs text-[#6B6B6B]">Añade al menos una variante.</span>}
+              {variantes.length === 0 && <span className="text-xs text-[#6B6B6B]">Opcional. Añade variantes si el producto tiene colores o tallas.</span>}
             </div>
           </div>
 
