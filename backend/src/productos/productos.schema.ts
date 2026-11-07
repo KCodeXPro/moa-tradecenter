@@ -17,7 +17,6 @@ export class Producto {
   @Prop({ type: [String], default: [] })
   imagenes: string[];
 
-  // NUEVO: Array de variantes (Color, Talla, Cantidad)
   @Prop({ type: Array, default: [] })
   variantes: { color: string; talla: string; cantidad: number }[];
 
@@ -43,7 +42,11 @@ export class Producto {
   seed: boolean;
 
   @Prop({ type: [String], default: [] })
-etiquetas: string[];
+  etiquetas: string[];
+
+  // 🔥 AGREGAR ESTE CAMPO
+  @Prop()
+  whatsapp: string; 
 }
 
 export const ProductoSchema = SchemaFactory.createForClass(Producto);
