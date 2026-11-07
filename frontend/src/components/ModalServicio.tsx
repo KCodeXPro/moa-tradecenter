@@ -26,12 +26,17 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<Prestador | null>(null);
   const [prestadoresCargando, setPrestadoresCargando] = useState(false);
 
+  // 🔥 MENSAJE PREDEFINIDO AL ABRIR EL MODAL
   useEffect(() => {
     if (servicio) {
       setVista(vistaInicial);
-      setTextoMensaje('');
       setError(null);
       setPrestadorSeleccionado(null);
+      if (vistaInicial === 'contacto' || vistaInicial === 'domicilio') {
+        setTextoMensaje(`Hola, estoy interesado en el servicio "${servicio.nombre}". ¿Podrías darme más información?`);
+      } else {
+        setTextoMensaje(`Hola, estoy interesado en el servicio "${servicio.nombre}". ¿Podrías darme más información?`);
+      }
     }
   }, [servicio, vistaInicial]);
 
@@ -45,8 +50,20 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
     ? { accent: 'text-[#4A7C59]', accentBg: 'bg-[#E8F5EC]', accentBorder: 'border-[#4A7C59]/30', button: 'bg-[#4A7C59] hover:bg-[#355A40]', inputFocus: 'focus:border-[#4A7C59] focus:ring-[#4A7C59]', disabled: 'bg-[#E8F5EC] text-[#4A7C59]' }
     : { accent: 'text-[#2E6B8A]', accentBg: 'bg-[#E0F2FE]', accentBorder: 'border-[#2E6B8A]/30', button: 'bg-[#2E6B8A] hover:bg-[#1F4B61]', inputFocus: 'focus:border-[#2E6B8A] focus:ring-[#2E6B8A]', disabled: 'bg-[#E0F2FE] text-[#2E6B8A]' };
 
-  const abrirContacto = () => { setError(null); setVista('contacto'); };
-  const abrirDomicilio = () => { setError(null); setVista('domicilio'); cargarPrestadores(); };
+  // 🔥 MENSAJE PREDEFINIDO AL HACER CLIC EN "MENSAJE"
+  const abrirContacto = () => { 
+    setError(null); 
+    setTextoMensaje(`Hola, estoy interesado en el servicio "${servicio.nombre}". ¿Podrías darme más información?`);
+    setVista('contacto'); 
+  };
+
+  // 🔥 MENSAJE PREDEFINIDO AL HACER CLIC EN "DOMICILIO"
+  const abrirDomicilio = () => { 
+    setError(null); 
+    setTextoMensaje(`Hola, me gustaría solicitar un domicilio para el servicio "${servicio.nombre}".`);
+    setVista('domicilio'); 
+    cargarPrestadores(); 
+  };
 
   const cargarPrestadores = async () => {
     setPrestadoresCargando(true);

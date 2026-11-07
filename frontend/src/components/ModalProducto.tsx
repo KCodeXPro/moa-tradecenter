@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface Producto {
@@ -47,12 +46,17 @@ export default function ModalProducto({ producto, onClose }: Props) {
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<Prestador | null>(null);
   const [prestadoresCargando, setPrestadoresCargando] = useState(false);
 
+  // 🔥 MENSAJE PREDEFINIDO AL ABRIR EL MODAL
   useEffect(() => {
     setImagenActiva(0);
     setVista(null);
-    setTextoMensaje('');
     setError(null);
     setPrestadorSeleccionado(null);
+    if (producto) {
+      setTextoMensaje(`Hola, estoy interesado en el producto "${producto.nombre}". ¿Sigue disponible?`);
+    } else {
+      setTextoMensaje('');
+    }
   }, [producto]);
 
   if (!producto) return null;
@@ -61,14 +65,18 @@ export default function ModalProducto({ producto, onClose }: Props) {
   const fotoPrincipal = tieneImagenes ? producto.imagenes![imagenActiva] : null;
   const precioFormateado = (producto.precio / 100).toFixed(2);
 
+  // 🔥 MENSAJE PREDEFINIDO AL HACER CLIC EN "MENSAJE"
   const abrirMensaje = () => {
     setError(null);
+    setTextoMensaje(`Hola, estoy interesado en el producto "${producto.nombre}". ¿Sigue disponible?`);
     setVista('mensaje');
   };
 
+  // 🔥 MENSAJE PREDEFINIDO AL HACER CLIC EN "DOMICILIO"
   const abrirDomicilio = () => {
     if (!producto.tieneDomicilio) return;
     setError(null);
+    setTextoMensaje(`Hola, me gustaría solicitar un domicilio para el producto "${producto.nombre}".`);
     setVista('domicilio-whatsapp');
     cargarPrestadores();
   };
@@ -87,7 +95,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
     }
   };
 
-  // 🔥 MODIFICADO: Ya no pide WhatsApp del comprador, va directo a la ventana
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -104,7 +111,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
     const urlWhatsApp = `https://wa.me/${producto.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
     window.open(urlWhatsApp, '_blank');
 
-    // Ya no guardamos en BD, solo mostramos la vista de éxito o cerramos
     setUltimaAccion('mensaje');
     setVista('exito');
   };
@@ -114,7 +120,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
     setError(null);
   };
 
-  // 🔥 MODIFICADO: Igual para domicilio, ya no pide número
   const solicitarDomicilio = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
