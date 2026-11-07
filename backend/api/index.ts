@@ -9,7 +9,16 @@ async function bootstrap() {
   if (!cachedApp) {
     const app = await NestFactory.create(AppModule);
     
-    app.enableCors();
+    // 🔥 CORS EXPLÍCITO AQUÍ TAMBIÉN
+    app.enableCors({
+      origin: [
+        'https://moa-tradecenter.vercel.app',
+        'http://localhost:5173'
+      ],
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      credentials: true,
+    });
+
     app.setGlobalPrefix('api');
     
     app.use(json({ limit: '50mb' }));
