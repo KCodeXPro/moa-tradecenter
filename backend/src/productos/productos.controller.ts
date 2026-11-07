@@ -20,10 +20,18 @@ export class ProductosController {
     return this.productosService.create(createProductoDto);
   }
 
+  // 🔥 MODIFICADO: Ahora recibe page y limit
   @Get()
-  findAll(@Query('vendedorId') vendedorId?: string): Promise<Producto[]> {
-    // Le pasamos el vendedorId al servicio
-    return this.productosService.findAll(vendedorId);
+  async findAll(
+    @Query('vendedorId') vendedorId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<any> {
+    return this.productosService.findAll(
+      vendedorId, 
+      page ? parseInt(page) : 1, 
+      limit ? parseInt(limit) : 10
+    );
   }
 
   @Get(':id')

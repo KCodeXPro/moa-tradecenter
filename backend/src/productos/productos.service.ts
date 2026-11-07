@@ -14,10 +14,38 @@ export class ProductosService {
     return producto.save();
   }
 
-  // Ahora recibe el vendedorId opcional
-  async findAll(vendedorId?: string): Promise<Producto[]> {
-    const filter = vendedorId ? { vendedorId } : {};
-    return this.productoModel.find(filter).sort({ createdAt: -1 }).exec();
+  // 🔥 MODIFICADO: Paginación, filtro de 30 días y vendedorId opcional
+  async findAll(vendedorId?: string, page: number = 1, limit: number = 10): Promise<any> {
+    // Si hay vendedorId, es el panel del vendedor: le mostramos TODO su catálogo
+    if (vendedorId) {
+      const data = await this.productoModel.find({ vendedorId }).sort({ createdAt: -1 }).exec();
+      return data; 
+    }
+
+    // Si no, es la página pública: Paginación + filtro de 30 días
+    const skip = (page - 1) * limit;
+    const hace30Dias = new Date();
+    hace30Dias.setDate(hace30Dias.getDate() - 30);
+
+    const filter = { 
+      updatedAt: { $gte: hace30Dias },
+      estado: 'activo' 
+    };
+
+    const total = await this.productoModel.countDocuments(filter);
+    const data = await this.productoModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async findOne(id: string): Promise<Producto> {
