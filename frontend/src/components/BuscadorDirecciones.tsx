@@ -97,10 +97,20 @@ export default function BuscadorDirecciones() {
       catData.forEach((c: Categoria) => { catMap[c._id] = c.icono; });
 
       const dirData = Array.isArray(resDir.data) ? resDir.data : [];
-      const dirsConIcono = dirData.map((d: any) => ({
-        ...d,
-        icono: d.categoriaId ? (catMap[d.categoriaId] || '🏪') : '🏪'
-      }));
+      const dirsConIcono = dirData.map((d: any) => {
+        // Lógica: Si tiene categoría, usa su icono. Si no, pero tiene nick, usa tienda. Si no tiene nick, usa casa.
+        let iconoAsignado = '🏠'; // Por defecto: casa
+        if (d.categoriaId) {
+          iconoAsignado = catMap[d.categoriaId] || '🏪';
+        } else if (d.nick) {
+          iconoAsignado = '🏪';
+        }
+        
+        return {
+          ...d,
+          icono: iconoAsignado
+        };
+      });
       const validas = dirsConIcono.filter((d: any) => d.lat != null && d.lon != null);
       setDireccionesAdmin(validas);
 

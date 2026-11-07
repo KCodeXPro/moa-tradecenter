@@ -80,11 +80,21 @@ export default function GestorDirecciones() {
         const catMap: Record<string, string> = {};
         catData.forEach((c: Categoria) => { catMap[c._id] = c.icono; });
 
-        const dirsAdmin: Direccion[] = dirData.map((d: any) => ({ 
-          ...d, 
-          esDeVendedor: false,
-          icono: d.categoriaId ? (catMap[d.categoriaId] || '🏪') : '🏪'
-        }));
+        const dirsAdmin: Direccion[] = dirData.map((d: any) => {
+          // Lógica: Si tiene categoría, usa su icono. Si no, pero tiene nick, usa tienda. Si no tiene nick, usa casa.
+          let iconoAsignado = '🏠'; // Por defecto: casa (sin nombre ni categoría)
+          if (d.categoriaId) {
+            iconoAsignado = catMap[d.categoriaId] || '🏪';
+          } else if (d.nick) {
+            iconoAsignado = '🏪'; // Tiene nombre pero no categoría -> tienda
+          }
+          
+          return { 
+            ...d, 
+            esDeVendedor: false,
+            icono: iconoAsignado
+          };
+        });
 
         const dirsVendedores: Direccion[] = [];
         usuData.forEach((u: any) => {
