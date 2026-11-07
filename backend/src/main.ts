@@ -7,7 +7,16 @@ async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
     
-    app.enableCors();
+    // 🔥 CONFIGURACIÓN DE CORS EXPLÍCITA PARA PRODUCCIÓN Y LOCAL
+    app.enableCors({
+      origin: [
+        'https://moa-tradecenter.vercel.app', // Tu frontend en Vercel
+        'http://localhost:5173'               // Tu frontend local (Vite)
+      ],
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      credentials: true,
+    });
+
     app.setGlobalPrefix('api');
 
     app.use(json({ limit: '50mb' }));
