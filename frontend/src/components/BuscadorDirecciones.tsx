@@ -4,7 +4,8 @@ import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Link, useLocation } from 'react-router-dom';
 
-// Solucionar los iconos de marcadores de Leaflet en React
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -12,7 +13,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Función para crear iconos dinámicos basados en un emoji
 const createEmojiIcon = (emoji: string) => {
   return L.divIcon({
     html: `<div style="font-size: 28px; line-height: 1; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.3)); transform: translateY(-10px);">${emoji}</div>`,
@@ -60,9 +60,8 @@ interface Categoria {
 export default function BuscadorDirecciones() {
   const location = useLocation();
 
-  // Estados para los 3 formularios
   const [busquedaEnlace, setBusquedaEnlace] = useState('');
-  const [busquedaNombre, setBusquedaNombre] = useState(''); // 🔥 NUEVO ESTADO
+  const [busquedaNombre, setBusquedaNombre] = useState('');
   
   const [calle, setCalle] = useState('');
   const [numero, setNumero] = useState('');
@@ -87,23 +86,26 @@ export default function BuscadorDirecciones() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('/api/usuarios/negocios-publicos'),
-      axios.get('/api/direcciones'),
-      axios.get('/api/categorias')
+      axios.get(`${API_URL}/usuarios/negocios-publicos`),
+      axios.get(`${API_URL}/direcciones`),
+      axios.get(`${API_URL}/categorias`)
     ]).then(([resNeg, resDir, resCat]) => {
-      setCategorias(resCat.data);
+      const catData = Array.isArray(resCat.data) ? resCat.data : [];
+      setCategorias(catData);
 
       const catMap: Record<string, string> = {};
-      resCat.data.forEach((c: Categoria) => { catMap[c._id] = c.icono; });
+      catData.forEach((c: Categoria) => { catMap[c._id] = c.icono; });
 
-      const dirsConIcono = resDir.data.map((d: any) => ({
+      const dirData = Array.isArray(resDir.data) ? resDir.data : [];
+      const dirsConIcono = dirData.map((d: any) => ({
         ...d,
         icono: d.categoriaId ? (catMap[d.categoriaId] || '🏪') : '🏪'
       }));
       const validas = dirsConIcono.filter((d: any) => d.lat != null && d.lon != null);
       setDireccionesAdmin(validas);
 
-      const negociosConIcono = resNeg.data.map((n: any) => ({
+      const negData = Array.isArray(resNeg.data) ? resNeg.data : [];
+      const negociosConIcono = negData.map((n: any) => ({
         ...n,
         icono: n.ubicacion?.categoriaId ? (catMap[n.ubicacion.categoriaId] || '👤') : '👤'
       }));
@@ -122,7 +124,7 @@ export default function BuscadorDirecciones() {
     if (val.trim().length > 0) setNumero('');
   };
 
-  // 🔥 FORMULARIO 1: Buscar por enlace/nick
+  // 🔥 FORMULARIO 1: Buscar por enlace/nick (Modificado para buscar en negocios)
   const buscarPorEnlace = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -140,8 +142,7 @@ export default function BuscadorDirecciones() {
 
     setCargando(true);
     try {
-      const res = await axios.get('/api/usuarios/negocios-publicos');
-      const negocio = res.data.find((n: any) => n.nick.toLowerCase() === nickABuscar.toLowerCase());
+      const negocio = negociosPublicos.find((n: any) => n.nick.toLowerCase() === nickABuscar.toLowerCase());
 
       if (negocio && negocio.ubicacion?.lat && negocio.ubicacion?.lon) {
         setResultados([{
@@ -167,7 +168,7 @@ export default function BuscadorDirecciones() {
     }
   };
 
-  // 🔥 FORMULARIO 2: Buscar por Nombre de Negocio
+  // 🔥 FORMULARIO 2: Buscar por Nombre de Negocio (CORREGIDO)
   const buscarPorNombre = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -180,23 +181,33 @@ export default function BuscadorDirecciones() {
 
     setCargando(true);
     try {
-      // Usamos el endpoint de buscar por nick
-      const res = await axios.get('/api/direcciones/buscar', {
-        params: { nick: busquedaNombre }
-      });
-      
-      if (res.data.length === 0) {
+      // Buscamos en las direcciones admin
+      const filtradosAdmin = direccionesAdmin.filter((d: any) => 
+        d.nick && d.nick.toLowerCase().includes(busquedaNombre.toLowerCase())
+      );
+
+      // También buscamos en los negocios públicos (vendedores)
+      const filtradosVendedores = negociosPublicos
+        .filter((n: any) => n.nick.toLowerCase().includes(busquedaNombre.toLowerCase()) && n.ubicacion?.lat)
+        .map((n: any) => ({
+          _id: n.nick,
+          calle: n.ubicacion.calle || '',
+          numero: n.ubicacion.numero || '',
+          entre: '',
+          edificio: n.ubicacion.edificio || '',
+          reparto: n.ubicacion.reparto || '',
+          lat: n.ubicacion.lat,
+          lon: n.ubicacion.lon,
+          nick: n.nick,
+          icono: n.icono || '👤'
+        }));
+
+      const todosLosResultados = [...filtradosAdmin, ...filtradosVendedores];
+
+      if (todosLosResultados.length === 0) {
         setError('No se encontró ningún negocio con ese nombre.');
       } else {
-        const catMap: Record<string, string> = {};
-        categorias.forEach((c) => { catMap[c._id] = c.icono; });
-        
-        const resultadosConIcono = res.data.map((d: any) => ({
-          ...d,
-          icono: d.categoriaId ? (catMap[d.categoriaId] || '🏪') : '🏪'
-        }));
-        
-        setResultados(resultadosConIcono);
+        setResultados(todosLosResultados);
       }
     } catch (err) {
       console.error(err);
@@ -206,7 +217,7 @@ export default function BuscadorDirecciones() {
     }
   };
 
-  // 🔥 FORMULARIO 3: Buscar por Dirección
+  // 🔥 FORMULARIO 3: Buscar por Dirección (Se mantiene igual)
   const handleBuscarDireccion = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -233,22 +244,19 @@ export default function BuscadorDirecciones() {
     setCargando(true);
 
     try {
-      const res = await axios.get('/api/direcciones/buscar', {
-        params: { calle, numero, entre, edificio, reparto }
+      // Buscamos en las direcciones admin localmente en lugar de hacer otra petición
+      const filtrados = direccionesAdmin.filter((d: any) => {
+        const matchCalle = d.calle?.toLowerCase().includes(calle.toLowerCase());
+        const matchReparto = d.reparto?.toLowerCase().includes(reparto.toLowerCase());
+        const matchNumero = tieneNumero ? d.numero?.includes(numero) : true;
+        const matchEdificio = tieneEdificio ? d.edificio?.toLowerCase().includes(edificio.toLowerCase()) : true;
+        return matchCalle && matchReparto && matchNumero && matchEdificio;
       });
       
-      if (res.data.length === 0) {
+      if (filtrados.length === 0) {
         setError('No se encontró ninguna dirección con esos datos.');
       } else {
-        const catMap: Record<string, string> = {};
-        categorias.forEach((c) => { catMap[c._id] = c.icono; });
-        
-        const resultadosConIcono = res.data.map((d: any) => ({
-          ...d,
-          icono: d.categoriaId ? (catMap[d.categoriaId] || '🏪') : '🏪'
-        }));
-        
-        setResultados(resultadosConIcono);
+        setResultados(filtrados);
       }
     } catch (err) {
       console.error(err);
