@@ -2,15 +2,17 @@
 import axios from 'axios';
 import InputWhatsApp from './InputWhatsApp';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 interface Props {
   servicio: any | null;
   onClose: () => void;
   tema?: 'azul' | 'coral' | 'verde';
-  vistaInicial?: 'detalle' | 'contacto'; // 🔥 AÑADIDO
+  vistaInicial?: 'detalle' | 'contacto';
 }
 
 export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaInicial = 'detalle' }: Props) {
-  const [vista, setVista] = useState<'detalle' | 'contacto'>(vistaInicial); // 🔥 Usa vistaInicial
+  const [vista, setVista] = useState<'detalle' | 'contacto'>(vistaInicial);
   const [whatsapp, setWhatsapp] = useState('');
   const [textoMensaje, setTextoMensaje] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +20,7 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
 
   useEffect(() => {
     if (servicio) {
-      setVista(vistaInicial); // 🔥 Se resetea a la vista inicial
+      setVista(vistaInicial);
       setWhatsapp('');
       setTextoMensaje('');
       setError(null);
@@ -30,7 +32,6 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
   const esWhatsappValido = /^\+53\s?[56]\d{7}$/.test(whatsapp);
   const precioFormateado = Math.round(servicio.precio / 100).toString();
 
-  // 🔥 PALETA DE COLORES (IGUAL QUE LA TUYA)
   const themeColors = tema === 'coral' 
     ? {
         accent: 'text-[#F97316]',
@@ -72,26 +73,42 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
       return;
     }
 
+    // 🔥 1. VALIDAMOS QUE EL SERVICIO TENGA WHATSAPP
+    if (!servicio.whatsapp) {
+      setError('El vendedor no tiene un WhatsApp registrado en este servicio.');
+      return;
+    }
+
+    // 🔥 2. ABRIMOS WHATSAPP PRIMERO (Aprovechando el clic del usuario)
+    const textoParaWhatsApp = textoMensaje.trim() 
+      ? textoMensaje 
+      : `Hola, vi tu servicio "${servicio.nombre}" en Moa Tradecenter y me interesa.`;
+      
+    const urlWhatsApp = `https://wa.me/${servicio.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
+    window.open(urlWhatsApp, '_blank');
+
+    // 🔥 3. GUARDAMOS EN LA BASE DE DATOS EN SEGUNDO PLANO
     setEnviando(true);
     try {
-      await axios.post('/api/mensajes', {
+      await axios.post(`${API_URL}/mensajes`, {
         vendedorId: servicio.vendedorId,
         servicioId: servicio._id,
         whatsappComprador: whatsapp,
         texto: textoMensaje,
       });
       
-      await axios.post('/api/eventos', {
+      await axios.post(`${API_URL}/eventos`, {
         productoId: servicio._id,
         vendedorId: servicio.vendedorId,
         tipo: 'servicio',
       });
 
-      alert('Mensaje enviado. El vendedor te contactará por WhatsApp.');
-      onClose();
+      onClose(); // Cerramos el modal al terminar
     } catch (err) {
       console.error(err);
-      setError('No se pudo enviar el mensaje. Intenta de nuevo.');
+      // Aunque falle el guardado en BD, WhatsApp ya se abrió.
+      // Solo cerramos el modal porque la acción principal se completó.
+      onClose(); 
     } finally {
       setEnviando(false);
     }
@@ -195,7 +212,7 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
                       : themeColors.button
                   }`}
                 >
-                  {enviando ? 'Enviando...' : 'Enviar mensaje'}
+                  {enviando ? 'Abriendo...' : 'Abrir WhatsApp'}
                 </button>
               </div>
             </form>
