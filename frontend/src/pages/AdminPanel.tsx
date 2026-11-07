@@ -64,7 +64,7 @@ export default function AdminPanel() {
     cargarDatos();
   }, [navigate]);
 
-    const cargarDatos = () => {
+      const cargarDatos = () => {
     Promise.all([
       axios.get(`${API_URL}/admin/dashboard`, { headers }),
       axios.get(`${API_URL}/admin/vendedores`, { headers }),
@@ -73,14 +73,14 @@ export default function AdminPanel() {
     ])
     .then(([resDashboard, resVendedores, resCategorias, resTopConsultados]) => {
       setStats(resDashboard.data);
-      // Validamos que sean arrays antes de guardarlos
+      // Parche para evitar que falle si no es un array
       setVendedores(Array.isArray(resVendedores.data) ? resVendedores.data : []);
       setCategorias(Array.isArray(resCategorias.data) ? resCategorias.data : []);
       setTopConsultados(Array.isArray(resTopConsultados.data) ? resTopConsultados.data : []);
       setCargando(false);
     })
     .catch((err) => {
-      console.error("Error cargando datos del panel:", err);
+      console.error("Error cargando datos:", err);
       setError('Error al cargar los datos del panel. Revisa la consola (F12).');
       setCargando(false);
     });

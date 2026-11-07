@@ -3,6 +3,8 @@ import axios from 'axios';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 // Iconos base de Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -11,7 +13,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Función para crear iconos dinámicos basados en un emoji
 const createEmojiIcon = (emoji: string) => {
   return L.divIcon({
     html: `<div style="font-size: 28px; line-height: 1; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.3)); transform: translateY(-10px);">${emoji}</div>`,
@@ -39,7 +40,7 @@ interface Direccion {
   lon: number;
   nick?: string;
   categoriaId?: string;
-  icono?: string; // Guardaremos el emoji aquí para mostrarlo
+  icono?: string; 
   esDeVendedor?: boolean;
 }
 
@@ -50,12 +51,12 @@ export default function GestorDirecciones() {
   const [entre, setEntre] = useState('');
   const [edificio, setEdificio] = useState('');
   const [reparto, setReparto] = useState('');
-  const [categoriaId, setCategoriaId] = useState(''); // 🔥 NUEVO ESTADO
+  const [categoriaId, setCategoriaId] = useState(''); 
   const [lat, setLat] = useState<number | null>(null);
   const [lon, setLon] = useState<number | null>(null);
   
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]); // 🔥 NUEVO ESTADO
+  const [categorias, setCategorias] = useState<Categoria[]>([]); 
   const [cargando, setCargando] = useState(true);
 
   const mapRef = useRef<L.Map | null>(null);
@@ -64,25 +65,29 @@ export default function GestorDirecciones() {
   const cargarTodo = () => {
     setCargando(true);
     Promise.all([
-      axios.get('/api/direcciones'),
-      axios.get('/api/usuarios'),
-      axios.get('/api/categorias') // 🔥 Cargamos categorías
+      axios.get(`${API_URL}/direcciones`),
+      axios.get(`${API_URL}/usuarios`),
+      axios.get(`${API_URL}/categorias`) 
     ])
       .then(([resDir, resUsu, resCat]) => {
-        setCategorias(resCat.data);
+        // PARCHE: Aseguramos que siempre sean arrays
+        const dirData = Array.isArray(resDir.data) ? resDir.data : [];
+        const usuData = Array.isArray(resUsu.data) ? resUsu.data : [];
+        const catData = Array.isArray(resCat.data) ? resCat.data : [];
 
-        // Creamos un mapa de categorías para buscar el icono fácilmente
+        setCategorias(catData);
+
         const catMap: Record<string, string> = {};
-        resCat.data.forEach((c: Categoria) => { catMap[c._id] = c.icono; });
+        catData.forEach((c: Categoria) => { catMap[c._id] = c.icono; });
 
-        const dirsAdmin: Direccion[] = resDir.data.map((d: any) => ({ 
+        const dirsAdmin: Direccion[] = dirData.map((d: any) => ({ 
           ...d, 
           esDeVendedor: false,
           icono: d.categoriaId ? (catMap[d.categoriaId] || '🏪') : '🏪'
         }));
 
         const dirsVendedores: Direccion[] = [];
-        resUsu.data.forEach((u: any) => {
+        usuData.forEach((u: any) => {
           if (u.ubicacion && u.ubicacion.lat && u.ubicacion.lon) {
             dirsVendedores.push({
               _id: u._id,
@@ -95,7 +100,7 @@ export default function GestorDirecciones() {
               lat: u.ubicacion.lat,
               lon: u.ubicacion.lon,
               esDeVendedor: true,
-              icono: '👤' // Icono por defecto para vendedores
+              icono: '👤'
             });
           }
         });
@@ -140,13 +145,12 @@ export default function GestorDirecciones() {
       return;
     }
 
-    // Buscamos el emoji seleccionado para guardarlo también (opcional, pero útil)
     const catSeleccionada = categorias.find(c => c._id === categoriaId);
     const iconoSeleccionado = catSeleccionada ? catSeleccionada.icono : '🏪';
 
-    axios.post('/api/direcciones', {
+    axios.post(`${API_URL}/direcciones`, {
       nick, calle, numero, entre, edificio, reparto, lat, lon, 
-      categoriaId, icono: iconoSeleccionado // Enviamos la categoría y el icono
+      categoriaId, icono: iconoSeleccionado
     })
       .then(() => {
         alert('Dirección guardada correctamente.');
@@ -163,11 +167,11 @@ export default function GestorDirecciones() {
     const idLimpio = String(dir._id).trim();
 
     if (dir.esDeVendedor) {
-      axios.delete(`/api/usuarios/${idLimpio}`)
+      axios.delete(`${API_URL}/usuarios/${idLimpio}`)
         .then(() => { alert('Vendedor eliminado.'); cargarTodo(); })
         .catch((err) => { alert('Error: ' + (err.response?.data?.message || err.message)); });
     } else {
-      axios.delete(`/api/direcciones/${idLimpio}`)
+      axios.delete(`${API_URL}/direcciones/${idLimpio}`)
         .then(() => { alert('Dirección eliminada.'); cargarTodo(); })
         .catch((err) => { alert('Error: ' + (err.response?.data?.message || err.message)); });
     }
@@ -186,7 +190,6 @@ export default function GestorDirecciones() {
             <input type="text" value={nick} onChange={(e) => setNick(e.target.value)} className="w-full px-3 py-2 rounded-[8px] border border-[#D9D4CC] text-sm focus:border-[#A63A2B] outline-none" placeholder="Ej: Agro Mercado" />
           </div>
 
-          {/* 🔥 SELECTOR DE CATEGORÍA */}
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-[#6B6B6B] mb-1">Categoría del Negocio</label>
             <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} className="w-full px-3 py-2 rounded-[8px] border border-[#D9D4CC] text-sm focus:border-[#A63A2B] outline-none bg-white">
@@ -220,7 +223,7 @@ export default function GestorDirecciones() {
                 <Marker 
                   key={`map-${dir._id}`} 
                   position={[dir.lat, dir.lon]} 
-                  icon={createEmojiIcon(dir.icono || '🏪')} // 🔥 Usamos el icono guardado
+                  icon={createEmojiIcon(dir.icono || '🏪')} 
                   zIndexOffset={direccionEnfocada === dir._id ? 1000 : 0}
                 >
                   <Popup>
@@ -238,7 +241,6 @@ export default function GestorDirecciones() {
         <div className="flex gap-3 mt-4"><button onClick={handleSave} className="bg-[#A63A2B] text-white px-4 py-2 rounded-[8px] font-bold text-sm hover:bg-[#7A2A1F] transition-colors">Guardar Dirección</button></div>
       </div>
 
-      {/* LISTA DE DIRECCIONES */}
       <div className="bg-white rounded-[14px] border border-[#D9D4CC] p-6 shadow-sm">
         <h2 className="text-xl font-bold text-[#2C2C2C] mb-4">Todas las Ubicaciones</h2>
         <div className="space-y-3">
