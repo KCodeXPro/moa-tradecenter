@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import InputWhatsApp from './InputWhatsApp';
 
-const API_URL = '/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 const WHATSAPP_REGEX = /^\+53\s?[56]\d{7}$/;
 
 interface Producto {

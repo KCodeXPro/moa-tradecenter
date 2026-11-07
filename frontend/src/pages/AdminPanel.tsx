@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import GestorDirecciones from '../components/GestorDirecciones';
 
-const API_URL = '/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface DashboardData {
   totalUsuarios: number;
@@ -64,7 +64,7 @@ export default function AdminPanel() {
     cargarDatos();
   }, [navigate]);
 
-  const cargarDatos = () => {
+    const cargarDatos = () => {
     Promise.all([
       axios.get(`${API_URL}/admin/dashboard`, { headers }),
       axios.get(`${API_URL}/admin/vendedores`, { headers }),
@@ -73,14 +73,15 @@ export default function AdminPanel() {
     ])
     .then(([resDashboard, resVendedores, resCategorias, resTopConsultados]) => {
       setStats(resDashboard.data);
-      setVendedores(resVendedores.data);
-      setCategorias(resCategorias.data);
-      setTopConsultados(resTopConsultados.data);
+      // Validamos que sean arrays antes de guardarlos
+      setVendedores(Array.isArray(resVendedores.data) ? resVendedores.data : []);
+      setCategorias(Array.isArray(resCategorias.data) ? resCategorias.data : []);
+      setTopConsultados(Array.isArray(resTopConsultados.data) ? resTopConsultados.data : []);
       setCargando(false);
     })
     .catch((err) => {
-      console.error(err);
-      setError('Error al cargar los datos del panel.');
+      console.error("Error cargando datos del panel:", err);
+      setError('Error al cargar los datos del panel. Revisa la consola (F12).');
       setCargando(false);
     });
   };
