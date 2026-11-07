@@ -156,7 +156,7 @@ export default function GestorDirecciones() {
     }
 
     const catSeleccionada = categorias.find(c => c._id === categoriaId);
-    const iconoSeleccionado = catSeleccionada ? catSeleccionada.icono : '🏪';
+    const iconoSeleccionado = catSeleccionada ? catSeleccionada.icono : '🏠';
 
     axios.post(`${API_URL}/direcciones`, {
       nick, calle, numero, entre, edificio, reparto, lat, lon, 

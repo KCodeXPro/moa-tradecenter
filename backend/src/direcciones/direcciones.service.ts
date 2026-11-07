@@ -9,12 +9,20 @@ export class DireccionesService {
     @InjectModel(Direccion.name) private direccionModel: Model<DireccionDocument>,
   ) {}
 
-  async create(dto: any): Promise<Direccion> {
+    async create(dto: any): Promise<Direccion> {
     if (!dto.calle || !dto.reparto) {
       throw new BadRequestException('La Calle y el Reparto son obligatorios.');
     }
     if (!dto.numero && !dto.edificio) {
       throw new BadRequestException('Debes indicar el Número/Casa o el Edificio.');
+    }
+
+    // 🔥 Lógica de icono: Si no hay categoría ni nick, es una casa.
+    let iconoFinal = '🏠';
+    if (dto.categoriaId) {
+      iconoFinal = dto.icono || '🏪';
+    } else if (dto.nick && dto.nick.trim() !== '') {
+      iconoFinal = '🏪';
     }
 
     const nuevaDireccion = new this.direccionModel({
@@ -26,11 +34,13 @@ export class DireccionesService {
       lat: dto.lat,
       lon: dto.lon,
       nick: dto.nick || '',
+      categoriaId: dto.categoriaId || null, // 🔥 Guardamos la categoría
+      icono: iconoFinal, // 🔥 Guardamos el icono calculado
     });
 
     return nuevaDireccion.save();
   }
-
+  
   async buscar(query: any): Promise<Direccion[]> {
     // 🔥 AHORA RECIBIMOS "nick" COMO PARÁMETRO INDEPENDIENTE
     const { calle, numero, entre, edificio, reparto, nick } = query;
