@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import axios from 'axios';
+import InputWhatsApp from './InputWhatsApp';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -15,6 +16,7 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
     nombre: '',
     descripcion: '',
     precio: '',
+    whatsapp: '', // 🔥 AGREGADO
     direccion: '',
     horario: '',
     esDomicilio: false,
@@ -26,11 +28,15 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
 
   useEffect(() => {
     if (isOpen) {
+      const savedUser = localStorage.getItem('moa_user');
+      const user = savedUser ? JSON.parse(savedUser) : null;
+
       if (servicioAEditar) {
         setFormData({
           nombre: servicioAEditar.nombre || '',
           descripcion: servicioAEditar.descripcion || '',
           precio: (servicioAEditar.precio / 100).toString(),
+          whatsapp: servicioAEditar.whatsapp || user?.whatsapp || '', // 🔥 Autocompletar
           direccion: servicioAEditar.direccion || '',
           horario: servicioAEditar.horario || '',
           esDomicilio: servicioAEditar.esDomicilio || false,
@@ -46,7 +52,9 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
         }
       } else {
         setFormData({
-          nombre: '', descripcion: '', precio: '', direccion: '', horario: '', esDomicilio: false, esDivisa: false,
+          nombre: '', descripcion: '', precio: '', 
+          whatsapp: user?.whatsapp || '', // 🔥 Autocompletar con el del perfil
+          direccion: '', horario: '', esDomicilio: false, esDivisa: false,
         });
         setMenu([]);
       }
@@ -185,6 +193,16 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
                     <input type="checkbox" name="esDomicilio" checked={formData.esDomicilio} onChange={handleChange} className="w-4 h-4 accent-[#4A7C59]" />
                     <span className="text-sm text-[#6B6B6B]">Sí, servicio a domicilio</span>
                   </label>
+                </div>
+
+                {/* 🔥 CAMPO DE WHATSAPP CON EL COMPONENTE INPUTWHATSAPP */}
+                <div>
+                  <label className="block text-sm font-bold text-[#2C2C2C] mb-1">WhatsApp (para contacto)</label>
+                  <InputWhatsApp 
+                    value={formData.whatsapp} 
+                    onChange={(val) => setFormData(prev => ({ ...prev, whatsapp: val }))} 
+                  />
+                  <p className="text-xs text-[#6B6B6B] mt-1">Se autocompleta con el de tu perfil, pero puedes cambiarlo.</p>
                 </div>
 
                 <div className="md:col-span-2">

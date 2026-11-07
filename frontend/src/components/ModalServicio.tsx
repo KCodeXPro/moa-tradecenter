@@ -4,19 +4,32 @@ import InputWhatsApp from './InputWhatsApp';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+interface Prestador {
+  _id: string;
+  nick: string;
+  whatsapp: string;
+  tarifaDomicilio: number;
+  disponible: boolean;
+}
+
 interface Props {
   servicio: any | null;
   onClose: () => void;
   tema?: 'azul' | 'coral' | 'verde';
-  vistaInicial?: 'detalle' | 'contacto';
+  vistaInicial?: 'detalle' | 'contacto' | 'domicilio'; // 🔥 Agregado 'domicilio'
 }
 
 export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaInicial = 'detalle' }: Props) {
-  const [vista, setVista] = useState<'detalle' | 'contacto'>(vistaInicial);
+  const [vista, setVista] = useState<'detalle' | 'contacto' | 'domicilio'>(vistaInicial);
   const [whatsapp, setWhatsapp] = useState('');
   const [textoMensaje, setTextoMensaje] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  
+  // 🔥 Estados para el flujo de domicilio
+  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<Prestador | null>(null);
+  const [prestadoresCargando, setPrestadoresCargando] = useState(false);
 
   useEffect(() => {
     if (servicio) {
@@ -24,6 +37,7 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
       setWhatsapp('');
       setTextoMensaje('');
       setError(null);
+      setPrestadorSeleccionado(null);
     }
   }, [servicio, vistaInicial]);
 
@@ -64,6 +78,26 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
     setVista('contacto');
   };
 
+  const abrirDomicilio = () => {
+    setError(null);
+    setVista('domicilio');
+    cargarPrestadores();
+  };
+
+  const cargarPrestadores = async () => {
+    setPrestadoresCargando(true);
+    setPrestadores([]);
+    try {
+      const res = await axios.get(`${API_URL}/usuarios/prestadores`);
+      setPrestadores(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+      setError('No se pudo cargar la lista de prestadores de domicilio.');
+    } finally {
+      setPrestadoresCargando(false);
+    }
+  };
+
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -73,13 +107,11 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
       return;
     }
 
-    // 🔥 1. VALIDAMOS QUE EL SERVICIO TENGA WHATSAPP
     if (!servicio.whatsapp) {
       setError('El vendedor no tiene un WhatsApp registrado en este servicio.');
       return;
     }
 
-    // 🔥 2. ABRIMOS WHATSAPP PRIMERO (Aprovechando el clic del usuario)
     const textoParaWhatsApp = textoMensaje.trim() 
       ? textoMensaje 
       : `Hola, vi tu servicio "${servicio.nombre}" en Moa Tradecenter y me interesa.`;
@@ -87,7 +119,6 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
     const urlWhatsApp = `https://wa.me/${servicio.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
     window.open(urlWhatsApp, '_blank');
 
-    // 🔥 3. GUARDAMOS EN LA BASE DE DATOS EN SEGUNDO PLANO
     setEnviando(true);
     try {
       await axios.post(`${API_URL}/mensajes`, {
@@ -103,12 +134,55 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
         tipo: 'servicio',
       });
 
-      onClose(); // Cerramos el modal al terminar
+      onClose();
     } catch (err) {
       console.error(err);
-      // Aunque falle el guardado en BD, WhatsApp ya se abrió.
-      // Solo cerramos el modal porque la acción principal se completó.
       onClose(); 
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const seleccionarPrestador = (p: Prestador) => {
+    setPrestadorSeleccionado(p);
+    setError(null);
+  };
+
+  const solicitarDomicilio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    
+    if (!prestadorSeleccionado) {
+      setError('Selecciona un prestador de domicilio.');
+      return;
+    }
+    if (!esWhatsappValido) {
+      setError('Ingresa un WhatsApp válido con formato cubano (+53 5XXXXXXX o +53 6XXXXXXX).');
+      return;
+    }
+
+    const textoParaWhatsApp = `Hola ${prestadorSeleccionado.nick}, necesito un domicilio para el servicio "${servicio.nombre}". Mi WhatsApp es ${whatsapp}.`;
+    const urlWhatsApp = `https://wa.me/${prestadorSeleccionado.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
+    window.open(urlWhatsApp, '_blank');
+
+    setEnviando(true);
+    try {
+      await axios.post(`${API_URL}/solicitudes-domicilio`, {
+        prestadorId: prestadorSeleccionado._id,
+        servicioId: servicio._id,
+        whatsappComprador: whatsapp,
+      });
+
+      await axios.post(`${API_URL}/eventos`, {
+        productoId: servicio._id,
+        vendedorId: servicio.vendedorId,
+        tipo: 'domicilio'
+      });
+
+      onClose();
+    } catch (err) {
+      console.error(err);
+      onClose();
     } finally {
       setEnviando(false);
     }
@@ -160,28 +234,92 @@ export default function ModalServicio({ servicio, onClose, tema = 'azul', vistaI
             </div>
           )}
 
-          {servicio.esDomicilio && (
+          {servicio.esDomicilio && vista !== 'domicilio' && (
             <div className={`rounded-[10px] p-4 border mt-2 ${themeColors.accentBg} ${themeColors.accentBorder}`}>
               <p className={`text-sm font-bold flex items-center gap-2 ${themeColors.accent}`}>
                 🛵 Este servicio ofrece atención a domicilio
               </p>
               <p className={`text-xs mt-1 opacity-80 ${themeColors.accent}`}>
-                Contáctanos por WhatsApp para coordinar la visita.
+                Puedes solicitar un prestador para que te lleve el servicio a tu casa.
               </p>
+            </div>
+          )}
+
+          {/* 🔥 FLUJO DE DOMICILIO DENTRO DEL MODAL */}
+          {vista === 'domicilio' && (
+            <div className="space-y-3">
+              <h3 className="text-base font-bold text-[#2C2C2C]">🛵 Solicitar domicilio</h3>
+              <label className="block text-sm font-medium text-[#2C2C2C] mb-1">Tu WhatsApp *</label>
+              <InputWhatsApp value={whatsapp} onChange={(val) => { setWhatsapp(val); setError(null); }} />
+              {!esWhatsappValido && whatsapp && <p className="text-xs text-[#B83A2E]">Formato inválido. Usa +53 5XXXXXXX.</p>}
+              {error && <p className="text-xs text-[#B83A2E]">{error}</p>}
+              
+              <div className="border border-[#D9D4CC] rounded-[10px] p-3 bg-white/10 backdrop-blur-md border border-white/20/50">
+                <p className="text-xs font-bold text-[#2C2C2C] mb-2 uppercase tracking-wider">Elige un prestador de domicilio</p>
+                {prestadoresCargando ? (
+                  <p className="text-sm text-[#6B6B6B]">Cargando prestadores...</p>
+                ) : prestadores.length === 0 ? (
+                  <p className="text-sm text-[#6B6B6B]">No hay prestadores disponibles en este momento.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {prestadores.map((p) => (
+                      <button key={p._id} onClick={() => seleccionarPrestador(p)} disabled={!p.disponible} className={`w-full flex items-center justify-between p-2.5 rounded-[8px] border text-left transition ${prestadorSeleccionado?._id === p._id ? 'bg-[#FFEDD5] border-[#F97316]' : 'bg-white border-[#D9D4CC] hover:bg-white/10 backdrop-blur-md border border-white/20'}`}>
+                        <div>
+                          <span className="text-sm font-bold text-[#2C2C2C] block">{p.nick}</span>
+                          <span className="text-xs text-[#6B6B6B]">{p.disponible ? 'Disponible' : 'No disponible'} • Tarifa ${(p.tarifaDomicilio / 100).toFixed(2)} CUP</span>
+                        </div>
+                        <span className="text-xs text-[#F97316] font-medium">{p.whatsapp}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setVista('detalle')}
+                  className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium"
+                >
+                  Volver
+                </button>
+                <button
+                  onClick={solicitarDomicilio}
+                  disabled={!prestadorSeleccionado || !esWhatsappValido || enviando}
+                  className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${
+                    prestadorSeleccionado && esWhatsappValido && !enviando
+                      ? 'bg-[#F97316] hover:bg-[#EA580C]'
+                      : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'
+                  }`}
+                >
+                  {enviando ? 'Abriendo...' : 'Abrir WhatsApp'}
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer fijo (Botones de Contacto) */}
         <div className="p-6 border-t border-[#D9D4CC] flex-shrink-0 bg-white rounded-b-[20px]">
-          {vista === 'detalle' ? (
-            <button
-              onClick={abrirContacto}
-              className={`w-full flex items-center justify-center gap-2 text-white py-3 rounded-[10px] font-bold text-lg transition-colors ${themeColors.button}`}
-            >
-              💬 Enviar mensaje por WhatsApp
-            </button>
-          ) : (
+          {vista === 'detalle' && (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={abrirContacto}
+                className={`w-full flex items-center justify-center gap-2 text-white py-3 rounded-[10px] font-bold transition-colors ${themeColors.button}`}
+              >
+                💬 Mensaje
+              </button>
+              {servicio.esDomicilio && (
+                <button
+                  onClick={abrirDomicilio}
+                  className="w-full flex items-center justify-center gap-2 bg-[#F97316] hover:bg-[#EA580C] text-white py-3 rounded-[10px] font-bold transition-colors"
+                >
+                  🛵 Domicilio
+                </button>
+              )}
+            </div>
+          )}
+
+          {vista === 'contacto' && (
             <form onSubmit={enviarMensaje} className="space-y-3">
               <InputWhatsApp
                 onChange={(val) => setWhatsapp(val)}
