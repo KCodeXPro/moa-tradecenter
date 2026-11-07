@@ -15,6 +15,7 @@ interface Producto {
   tieneDomicilio: boolean;
   imagenes?: string[];
   variantes?: { color: string; talla: string; cantidad: number }[];
+  whatsapp?: string; // 🔥 AGREGADO
 }
 
 interface Prestador {
@@ -92,6 +93,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
     }
   };
 
+  // 🔥 FUNCIÓN MODIFICADA
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -99,6 +101,16 @@ export default function ModalProducto({ producto, onClose }: Props) {
       setError('Ingresa un WhatsApp válido con formato cubano (+53 5XXXXXXX).');
       return;
     }
+
+    // 1. Abrimos WhatsApp PRIMERO (para que el navegador no lo bloquee)
+    const textoParaWhatsApp = textoMensaje.trim() 
+      ? textoMensaje 
+      : `Hola, vi tu producto "${producto.nombre}" en Moa Tradecenter y me interesa.`;
+    
+    const urlWhatsApp = `https://wa.me/${producto.whatsapp?.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
+    window.open(urlWhatsApp, '_blank');
+
+    // 2. Guardamos en la base de datos (en segundo plano)
     setEnviando(true);
     try {
       await axios.post(`${API_URL}/mensajes`, {
@@ -107,7 +119,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
         whatsappComprador: whatsapp,
         texto: textoMensaje,
       });
-      await axios.post('/api/eventos', {
+      await axios.post(`${API_URL}/eventos`, {
         productoId: producto._id,
         vendedorId: producto.vendedorId,
         tipo: 'mensaje'
@@ -115,7 +127,10 @@ export default function ModalProducto({ producto, onClose }: Props) {
       setUltimaAccion('mensaje');
       setVista('exito');
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'No se pudo enviar el mensaje. Inténtalo de nuevo.');
+      console.error(err);
+      // Aunque falle el guardado en BD, WhatsApp ya se abrió, así que mostramos éxito igual
+      setUltimaAccion('mensaje');
+      setVista('exito');
     } finally {
       setEnviando(false);
     }
@@ -137,6 +152,13 @@ export default function ModalProducto({ producto, onClose }: Props) {
       setError('Ingresa un WhatsApp válido con formato cubano (+53 5XXXXXXX).');
       return;
     }
+
+    // 1. Abrimos WhatsApp del prestador PRIMERO
+    const textoParaWhatsApp = `Hola ${prestadorSeleccionado.nick}, necesito un domicilio para el producto "${producto.nombre}". Mi WhatsApp es ${whatsapp}.`;
+    const urlWhatsApp = `https://wa.me/${prestadorSeleccionado.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
+    window.open(urlWhatsApp, '_blank');
+
+    // 2. Guardamos en la base de datos
     setEnviando(true);
     try {
       await axios.post(`${API_URL}/solicitudes-domicilio`, {
@@ -145,7 +167,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
         whatsappComprador: whatsapp,
       });
 
-      await axios.post('/api/eventos', {
+      await axios.post(`${API_URL}/eventos`, {
         productoId: producto._id,
         vendedorId: producto.vendedorId,
         tipo: 'domicilio'
@@ -154,7 +176,9 @@ export default function ModalProducto({ producto, onClose }: Props) {
       setUltimaAccion('domicilio');
       setVista('exito');
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'No se pudo crear la solicitud de domicilio. Inténtalo de nuevo.');
+      console.error(err);
+      setUltimaAccion('domicilio');
+      setVista('exito');
     } finally {
       setEnviando(false);
     }
@@ -232,7 +256,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
               <div className="w-12 h-12 rounded-full bg-[#4A7C59]/10 flex items-center justify-center mx-auto mb-3 text-[#4A7C59] text-2xl">✓</div>
               <h3 className="font-bold text-[#2C2C2C] mb-2">Operación realizada</h3>
               <p className="text-[#6B6B6B] text-sm mb-4">
-                {ultimaAccion === 'mensaje' ? 'Mensaje enviado. El vendedor te contactará por WhatsApp.' : 'Solicitud enviada. El prestador te contactará por WhatsApp.'}
+                {ultimaAccion === 'mensaje' ? 'Se ha abierto WhatsApp con tu mensaje. Solo presiona "Enviar" allí para contactar al vendedor.' : 'Se ha abierto WhatsApp del prestador. Solo presiona "Enviar" allí para solicitar tu domicilio.'}
               </p>
               <button onClick={onClose} className="bg-[#A63A2B] hover:bg-[#7A2A1F] text-white px-6 py-2 rounded-[10px] font-bold">Cerrar</button>
             </div>
@@ -250,7 +274,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setVista(null)} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Cancelar</button>
                 <button type="submit" disabled={enviando || !esWhatsappValido} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${esWhatsappValido && !enviando ? 'bg-[#A63A2B] hover:bg-[#7A2A1F]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                  {enviando ? 'Enviando...' : 'Enviar mensaje'}
+                  {enviando ? 'Enviando...' : 'Abrir WhatsApp'}
                 </button>
               </div>
             </form>
@@ -273,7 +297,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
                 ) : (
                   <div className="space-y-2">
                     {prestadores.map((p) => (
-                      /* 🔥 CAMBIO DE COLOR EN LA SELECCIÓN DE PRESTADOR */
                       <button key={p._id} onClick={() => seleccionarPrestador(p)} disabled={!p.disponible} className={`w-full flex items-center justify-between p-2.5 rounded-[8px] border text-left transition ${prestadorSeleccionado?._id === p._id ? 'bg-[#FFEDD5] border-[#F97316]' : 'bg-white border-[#D9D4CC] hover:bg-white/10 backdrop-blur-md border border-white/20'}`}>
                         <div>
                           <span className="text-sm font-bold text-[#2C2C2C] block">{p.nick}</span>
@@ -293,7 +316,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
                 >
                   Volver
                 </button>
-                {/* 🔥 BOTÓN CONTINUAR EN CORAL */}
                 <button
                   onClick={() => {
                     if (prestadorSeleccionado && esWhatsappValido) {
@@ -326,7 +348,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
               <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[10px] p-3 border border-[#D9D4CC]">
                 <p className="text-xs font-bold text-[#2C2C2C] mb-1 uppercase tracking-wider">Prestador</p>
                 <p className="text-sm text-[#2C2C2C] font-bold">{prestadorSeleccionado?.nick}</p>
-                {/* 🔥 WHATSAPP EN CORAL */}
                 <p className="text-xs text-[#6B6B6B]">Tarifa {formatoCentavos(prestadorSeleccionado!.tarifaDomicilio)} CUP • WhatsApp: <span className="font-bold text-[#F97316]">{prestadorSeleccionado!.whatsapp}</span></p>
               </div>
               <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[10px] p-3 border border-[#D9D4CC]">
@@ -337,9 +358,8 @@ export default function ModalProducto({ producto, onClose }: Props) {
               {error && <p className="text-xs text-[#B83A2E]">{error}</p>}
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setVista('domicilio-whatsapp')} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Volver</button>
-                {/* 🔥 BOTÓN CONFIRMAR EN CORAL */}
                 <button onClick={solicitarDomicilio} disabled={enviando} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${!enviando ? 'bg-[#F97316] hover:bg-[#EA580C]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                  {enviando ? 'Enviando...' : 'Confirmar solicitud'}
+                  {enviando ? 'Enviando...' : 'Abrir WhatsApp'}
                 </button>
               </div>
             </div>
@@ -348,7 +368,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
           {vista === null && (
             <div className="grid grid-cols-2 gap-3 mt-4">
               <button onClick={abrirMensaje} className="bg-[#A63A2B] hover:bg-[#7A2A1F] text-white py-3 rounded-[10px] font-bold">💬 Mensaje</button>
-              {/* 🔥 BOTÓN DE DOMICILIO EN CORAL */}
               <button onClick={abrirDomicilio} disabled={!producto.tieneDomicilio} className={`py-3 rounded-[10px] font-bold transition ${producto.tieneDomicilio ? 'bg-[#F97316] hover:bg-[#EA580C] text-white' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
                 🛵 Domicilio
               </button>
