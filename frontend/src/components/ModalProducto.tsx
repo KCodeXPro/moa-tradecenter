@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import InputWhatsApp from './InputWhatsApp';
+
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-const WHATSAPP_REGEX = /^\+53\s?[56]\d{7}$/;
 
 interface Producto {
   _id: string;
@@ -41,10 +40,8 @@ interface Props {
 export default function ModalProducto({ producto, onClose }: Props) {
   const [imagenActiva, setImagenActiva] = useState(0);
   const [vista, setVista] = useState<ModalVista>(null);
-  const [whatsapp, setWhatsapp] = useState('');
   const [textoMensaje, setTextoMensaje] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
   const [ultimaAccion, setUltimaAccion] = useState<'mensaje' | 'domicilio' | null>(null);
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<Prestador | null>(null);
@@ -53,7 +50,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
   useEffect(() => {
     setImagenActiva(0);
     setVista(null);
-    setWhatsapp('');
     setTextoMensaje('');
     setError(null);
     setPrestadorSeleccionado(null);
@@ -64,8 +60,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
   const tieneImagenes = producto.imagenes && producto.imagenes.length > 0;
   const fotoPrincipal = tieneImagenes ? producto.imagenes![imagenActiva] : null;
   const precioFormateado = (producto.precio / 100).toFixed(2);
-  const esWhatsappValido = WHATSAPP_REGEX.test(whatsapp);
-  const formatoCentavos = (centavos: number) => (centavos / 100).toFixed(2);
 
   const abrirMensaje = () => {
     setError(null);
@@ -93,21 +87,16 @@ export default function ModalProducto({ producto, onClose }: Props) {
     }
   };
 
+  // 🔥 MODIFICADO: Ya no pide WhatsApp del comprador, va directo a la ventana
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!esWhatsappValido) {
-      setError('Ingresa un WhatsApp válido con formato cubano (+53 5XXXXXXX).');
-      return;
-    }
 
-    // 🔥 VALIDACIÓN EXTRA: Si el producto no tiene whatsapp, no podemos abrir la ventana
     if (!producto.whatsapp) {
-      setError('El vendedor no tiene un WhatsApp registrado en este producto. Contacta al administrador.');
+      setError('El vendedor no tiene un WhatsApp registrado en este producto.');
       return;
     }
 
-    // 1. Abrimos WhatsApp PRIMERO (para que el navegador no lo bloquee)
     const textoParaWhatsApp = textoMensaje.trim() 
       ? textoMensaje 
       : `Hola, vi tu producto "${producto.nombre}" en Moa Tradecenter y me interesa.`;
@@ -115,29 +104,9 @@ export default function ModalProducto({ producto, onClose }: Props) {
     const urlWhatsApp = `https://wa.me/${producto.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
     window.open(urlWhatsApp, '_blank');
 
-    // 2. Guardamos en la base de datos (en segundo plano)
-    setEnviando(true);
-    try {
-      await axios.post(`${API_URL}/mensajes`, {
-        vendedorId: producto.vendedorId,
-        productoId: producto._id,
-        whatsappComprador: whatsapp,
-        texto: textoMensaje,
-      });
-      await axios.post(`${API_URL}/eventos`, {
-        productoId: producto._id,
-        vendedorId: producto.vendedorId,
-        tipo: 'mensaje'
-      });
-      setUltimaAccion('mensaje');
-      setVista('exito');
-    } catch (err: any) {
-      console.error(err);
-      setUltimaAccion('mensaje');
-      setVista('exito');
-    } finally {
-      setEnviando(false);
-    }
+    // Ya no guardamos en BD, solo mostramos la vista de éxito o cerramos
+    setUltimaAccion('mensaje');
+    setVista('exito');
   };
 
   const seleccionarPrestador = (p: Prestador) => {
@@ -145,47 +114,22 @@ export default function ModalProducto({ producto, onClose }: Props) {
     setError(null);
   };
 
+  // 🔥 MODIFICADO: Igual para domicilio, ya no pide número
   const solicitarDomicilio = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    
     if (!prestadorSeleccionado) {
       setError('Selecciona un prestador de domicilio.');
       return;
     }
-    if (!esWhatsappValido) {
-      setError('Ingresa un WhatsApp válido con formato cubano (+53 5XXXXXXX).');
-      return;
-    }
 
-    // 1. Abrimos WhatsApp del prestador PRIMERO
-    const textoParaWhatsApp = `Hola ${prestadorSeleccionado.nick}, necesito un domicilio para el producto "${producto.nombre}". Mi WhatsApp es ${whatsapp}.`;
+    const textoParaWhatsApp = `Hola ${prestadorSeleccionado.nick}, necesito un domicilio para el producto "${producto.nombre}".`;
     const urlWhatsApp = `https://wa.me/${prestadorSeleccionado.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
     window.open(urlWhatsApp, '_blank');
 
-    // 2. Guardamos en la base de datos
-    setEnviando(true);
-    try {
-      await axios.post(`${API_URL}/solicitudes-domicilio`, {
-        prestadorId: prestadorSeleccionado._id,
-        productoId: producto._id,
-        whatsappComprador: whatsapp,
-      });
-
-      await axios.post(`${API_URL}/eventos`, {
-        productoId: producto._id,
-        vendedorId: producto.vendedorId,
-        tipo: 'domicilio'
-      });
-
-      setUltimaAccion('domicilio');
-      setVista('exito');
-    } catch (err: any) {
-      console.error(err);
-      setUltimaAccion('domicilio');
-      setVista('exito');
-    } finally {
-      setEnviando(false);
-    }
+    setUltimaAccion('domicilio');
+    setVista('exito');
   };
 
   return (
@@ -269,16 +213,13 @@ export default function ModalProducto({ producto, onClose }: Props) {
           {vista === 'mensaje' && (
             <form onSubmit={enviarMensaje} className="space-y-3">
               <h3 className="text-base font-bold text-[#2C2C2C]">💬 Enviar mensaje al vendedor</h3>
-              <label className="block text-sm font-medium text-[#2C2C2C] mb-1">Tu WhatsApp *</label>
-              <InputWhatsApp value={whatsapp} onChange={setWhatsapp} />
-              {!esWhatsappValido && whatsapp && <p className="text-xs text-[#B83A2E]">Formato inválido. Usa +53 5XXXXXXX.</p>}
               {error && <p className="text-xs text-[#B83A2E]">{error}</p>}
               <label className="block text-sm font-medium text-[#2C2C2C] mb-1">Mensaje (opcional)</label>
               <textarea value={textoMensaje} onChange={(e) => setTextoMensaje(e.target.value)} placeholder="Tu consulta..." rows={2} className="w-full border border-[#D9D4CC] rounded-[8px] px-3 py-2 text-[#2C2C2C] focus:outline-none focus:border-[#A63A2B]" />
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setVista(null)} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Cancelar</button>
-                <button type="submit" disabled={enviando || !esWhatsappValido} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${esWhatsappValido && !enviando ? 'bg-[#A63A2B] hover:bg-[#7A2A1F]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                  {enviando ? 'Abriendo...' : 'Abrir WhatsApp'}
+                <button type="submit" className="flex-1 py-2 rounded-[10px] font-bold text-white bg-[#A63A2B] hover:bg-[#7A2A1F]">
+                  Abrir WhatsApp
                 </button>
               </div>
             </form>
@@ -287,9 +228,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
           {vista === 'domicilio-whatsapp' && (
             <div className="space-y-3">
               <h3 className="text-base font-bold text-[#2C2C2C]">🛵 Solicitar domicilio</h3>
-              <label className="block text-sm font-medium text-[#2C2C2C] mb-1">Tu WhatsApp *</label>
-              <InputWhatsApp value={whatsapp} onChange={(val) => { setWhatsapp(val); setError(null); }} />
-              {!esWhatsappValido && whatsapp && <p className="text-xs text-[#B83A2E]">Formato inválido. Usa +53 5XXXXXXX.</p>}
               {error && <p className="text-xs text-[#B83A2E]">{error}</p>}
               
               <div className="border border-[#D9D4CC] rounded-[10px] p-3 bg-white/10 backdrop-blur-md border border-white/20/50">
@@ -304,7 +242,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
                       <button key={p._id} onClick={() => seleccionarPrestador(p)} disabled={!p.disponible} className={`w-full flex items-center justify-between p-2.5 rounded-[8px] border text-left transition ${prestadorSeleccionado?._id === p._id ? 'bg-[#FFEDD5] border-[#F97316]' : 'bg-white border-[#D9D4CC] hover:bg-white/10 backdrop-blur-md border border-white/20'}`}>
                         <div>
                           <span className="text-sm font-bold text-[#2C2C2C] block">{p.nick}</span>
-                          <span className="text-xs text-[#6B6B6B]">{p.disponible ? 'Disponible' : 'No disponible'} • Tarifa {formatoCentavos(p.tarifaDomicilio)} CUP</span>
+                          <span className="text-xs text-[#6B6B6B]">{p.disponible ? 'Disponible' : 'No disponible'} • Tarifa {(p.tarifaDomicilio / 100).toFixed(2)} CUP</span>
                         </div>
                         <span className="text-xs text-[#F97316] font-medium">{p.whatsapp}</span>
                       </button>
@@ -314,56 +252,9 @@ export default function ModalProducto({ producto, onClose }: Props) {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setVista(null)}
-                  className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium"
-                >
-                  Volver
-                </button>
-                <button
-                  onClick={() => {
-                    if (prestadorSeleccionado && esWhatsappValido) {
-                      setVista('domicilio-resumen');
-                    } else if (!prestadorSeleccionado) {
-                      setError('Selecciona un prestador para continuar.');
-                    }
-                  }}
-                  disabled={!prestadorSeleccionado || !esWhatsappValido || enviando}
-                  className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${
-                    prestadorSeleccionado && esWhatsappValido && !enviando
-                      ? 'bg-[#F97316] hover:bg-[#EA580C]'
-                      : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'
-                  }`}
-                >
-                  Continuar
-                </button>
-              </div>
-            </div>
-          )}
-
-          {vista === 'domicilio-resumen' && (
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#2C2C2C]">🛵 Confirmar solicitud de domicilio</h3>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[10px] p-3 border border-[#D9D4CC]">
-                <p className="text-xs font-bold text-[#2C2C2C] mb-1 uppercase tracking-wider">Producto</p>
-                <p className="text-sm text-[#2C2C2C] font-bold">{producto.nombre}</p>
-                <p className="text-xs text-[#6B6B6B]">${precioFormateado} CUP</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[10px] p-3 border border-[#D9D4CC]">
-                <p className="text-xs font-bold text-[#2C2C2C] mb-1 uppercase tracking-wider">Prestador</p>
-                <p className="text-sm text-[#2C2C2C] font-bold">{prestadorSeleccionado?.nick}</p>
-                <p className="text-xs text-[#6B6B6B]">Tarifa {formatoCentavos(prestadorSeleccionado!.tarifaDomicilio)} CUP • WhatsApp: <span className="font-bold text-[#F97316]">{prestadorSeleccionado!.whatsapp}</span></p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[10px] p-3 border border-[#D9D4CC]">
-                <p className="text-xs font-bold text-[#2C2C2C] mb-1 uppercase tracking-wider">Tu WhatsApp</p>
-                <p className="text-sm font-bold text-[#2C2C2C]">{whatsapp}</p>
-                <p className="text-xs text-[#6B6B6B]">El prestador te contactará por este número.</p>
-              </div>
-              {error && <p className="text-xs text-[#B83A2E]">{error}</p>}
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => setVista('domicilio-whatsapp')} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Volver</button>
-                <button onClick={solicitarDomicilio} disabled={enviando} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${!enviando ? 'bg-[#F97316] hover:bg-[#EA580C]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                  {enviando ? 'Abriendo...' : 'Abrir WhatsApp'}
+                <button onClick={() => setVista(null)} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Volver</button>
+                <button onClick={solicitarDomicilio} disabled={!prestadorSeleccionado} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${prestadorSeleccionado ? 'bg-[#F97316] hover:bg-[#EA580C]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
+                  Abrir WhatsApp
                 </button>
               </div>
             </div>
