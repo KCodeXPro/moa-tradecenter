@@ -1,6 +1,8 @@
 ﻿import { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 interface ModalCrearServicioProps {
   isOpen: boolean;
   onClose: () => void;
@@ -13,8 +15,6 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
     nombre: '',
     descripcion: '',
     precio: '',
-    whatsapp: '',
-    telefono: '',
     direccion: '',
     horario: '',
     esDomicilio: false,
@@ -31,8 +31,6 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
           nombre: servicioAEditar.nombre || '',
           descripcion: servicioAEditar.descripcion || '',
           precio: (servicioAEditar.precio / 100).toString(),
-          whatsapp: servicioAEditar.whatsapp || '',
-          telefono: servicioAEditar.telefono || '',
           direccion: servicioAEditar.direccion || '',
           horario: servicioAEditar.horario || '',
           esDomicilio: servicioAEditar.esDomicilio || false,
@@ -48,8 +46,7 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
         }
       } else {
         setFormData({
-          nombre: '', descripcion: '', precio: '', whatsapp: '',
-          telefono: '', direccion: '', horario: '', esDomicilio: false, esDivisa: false,
+          nombre: '', descripcion: '', precio: '', direccion: '', horario: '', esDomicilio: false, esDivisa: false,
         });
         setMenu([]);
       }
@@ -113,9 +110,9 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
       };
 
       if (servicioAEditar) {
-        await axios.put(`/api/servicios/${servicioAEditar._id}`, payload);
+        await axios.put(`${API_URL}/servicios/${servicioAEditar._id}`, payload);
       } else {
-        await axios.post('/api/servicios', payload);
+        await axios.post(`${API_URL}/servicios`, payload);
       }
       
       onSuccess();
@@ -138,7 +135,6 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F5F0E8] text-[#2C2C2C] hover:bg-[#E8E2D9]">✕</button>
         </div>
 
-        {/* 🔥 CHECKBOX DE DIVISA (MOVIDO FUERA DEL FORMULARIO CON SCROLL) */}
         <div className="p-4 bg-blue-50 border-b border-blue-200 shrink-0">
           <label className="flex items-start gap-3 cursor-pointer">
             <input 
@@ -181,7 +177,6 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
               <input type="number" name="precio" value={formData.precio} onChange={handleChange} className="w-full border border-[#D9D4CC] rounded-[8px] px-3 py-2" placeholder="0" />
             </div>
 
-            {/* CAMPOS QUE SE OCULTAN SI ES DIVISA */}
             {!formData.esDivisa && (
               <>
                 <div>
@@ -190,16 +185,6 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
                     <input type="checkbox" name="esDomicilio" checked={formData.esDomicilio} onChange={handleChange} className="w-4 h-4 accent-[#4A7C59]" />
                     <span className="text-sm text-[#6B6B6B]">Sí, servicio a domicilio</span>
                   </label>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-[#2C2C2C] mb-1">WhatsApp</label>
-                  <input name="whatsapp" value={formData.whatsapp} onChange={handleChange} className="w-full border border-[#D9D4CC] rounded-[8px] px-3 py-2" placeholder="+5350000000" />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-[#2C2C2C] mb-1">Teléfono Fijo</label>
-                  <input name="telefono" value={formData.telefono} onChange={handleChange} className="w-full border border-[#D9D4CC] rounded-[8px] px-3 py-2" placeholder="Opcional" />
                 </div>
 
                 <div className="md:col-span-2">
@@ -215,7 +200,6 @@ export default function ModalCrearServicio({ isOpen, onClose, onSuccess, servici
             )}
           </div>
 
-          {/* MENÚ (SOLO SI NO ES DIVISA) */}
           {!formData.esDivisa && (
             <div className="border-t border-[#D9D4CC] pt-4">
               <div className="flex justify-between items-center mb-3">

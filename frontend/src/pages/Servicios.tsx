@@ -86,19 +86,8 @@ export default function Servicios() {
   const serviciosFiltrados = useMemo(() => {
     let result = [...servicios];
 
-    // Filtro reforzado para excluir divisas y domicilios
-    const categoriaDomicilio = categorias.find(c => 
-      c.nombre.toLowerCase().includes('domicilio')
-    );
-
-    result = result.filter(s => {
-      if (s.esDivisa) return false;
-      if (s.esDomicilio) return false;
-      const nombreOdesc = (s.nombre + ' ' + s.descripcion).toLowerCase();
-      if (nombreOdesc.includes('domicilio')) return false;
-      if (categoriaDomicilio && s.categoriaId === categoriaDomicilio._id) return false;
-      return true;
-    });
+    // 🔥 Solo excluimos las divisas del directorio principal (los domicilios SÍ se muestran)
+    result = result.filter(s => !s.esDivisa);
 
     if (busqueda) {
       result = result.filter(s => s.nombre.toLowerCase().includes(busqueda.toLowerCase()));
@@ -119,7 +108,7 @@ export default function Servicios() {
     else if (filtroOrden === 'precio-desc') result.sort((a, b) => b.precio - a.precio);
 
     return result;
-  }, [servicios, categorias, busqueda, busquedaVendedor, vendedores, filtroOrden, filtroCategoria]);
+  }, [servicios, busqueda, busquedaVendedor, vendedores, filtroOrden, filtroCategoria]);
 
   if (cargando) return <div className="text-center py-12 text-[#6B6B6B]">Cargando servicios...</div>;
   if (error) return <div className="text-center py-12 text-[#B83A2E]">{error}</div>;

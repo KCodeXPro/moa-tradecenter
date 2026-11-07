@@ -15,7 +15,7 @@ interface Producto {
   tieneDomicilio: boolean;
   imagenes?: string[];
   variantes?: { color: string; talla: string; cantidad: number }[];
-  whatsapp?: string; // 🔥 AGREGADO
+  whatsapp?: string; 
 }
 
 interface Prestador {
@@ -93,7 +93,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
     }
   };
 
-  // 🔥 FUNCIÓN MODIFICADA
   const enviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -102,12 +101,18 @@ export default function ModalProducto({ producto, onClose }: Props) {
       return;
     }
 
+    // 🔥 VALIDACIÓN EXTRA: Si el producto no tiene whatsapp, no podemos abrir la ventana
+    if (!producto.whatsapp) {
+      setError('El vendedor no tiene un WhatsApp registrado en este producto. Contacta al administrador.');
+      return;
+    }
+
     // 1. Abrimos WhatsApp PRIMERO (para que el navegador no lo bloquee)
     const textoParaWhatsApp = textoMensaje.trim() 
       ? textoMensaje 
       : `Hola, vi tu producto "${producto.nombre}" en Moa Tradecenter y me interesa.`;
     
-    const urlWhatsApp = `https://wa.me/${producto.whatsapp?.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
+    const urlWhatsApp = `https://wa.me/${producto.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
     window.open(urlWhatsApp, '_blank');
 
     // 2. Guardamos en la base de datos (en segundo plano)
@@ -128,7 +133,6 @@ export default function ModalProducto({ producto, onClose }: Props) {
       setVista('exito');
     } catch (err: any) {
       console.error(err);
-      // Aunque falle el guardado en BD, WhatsApp ya se abrió, así que mostramos éxito igual
       setUltimaAccion('mensaje');
       setVista('exito');
     } finally {
@@ -274,7 +278,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setVista(null)} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Cancelar</button>
                 <button type="submit" disabled={enviando || !esWhatsappValido} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${esWhatsappValido && !enviando ? 'bg-[#A63A2B] hover:bg-[#7A2A1F]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                  {enviando ? 'Enviando...' : 'Abrir WhatsApp'}
+                  {enviando ? 'Abriendo...' : 'Abrir WhatsApp'}
                 </button>
               </div>
             </form>
@@ -359,7 +363,7 @@ export default function ModalProducto({ producto, onClose }: Props) {
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setVista('domicilio-whatsapp')} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Volver</button>
                 <button onClick={solicitarDomicilio} disabled={enviando} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${!enviando ? 'bg-[#F97316] hover:bg-[#EA580C]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                  {enviando ? 'Enviando...' : 'Abrir WhatsApp'}
+                  {enviando ? 'Abriendo...' : 'Abrir WhatsApp'}
                 </button>
               </div>
             </div>
