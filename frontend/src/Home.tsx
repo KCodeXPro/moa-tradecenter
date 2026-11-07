@@ -56,9 +56,27 @@ export default function Home() {
       axios.get('/api/servicios')
     ])
     .then(([resProductos, resServicios]) => {
-      const productosOrdenados = resProductos.data.sort((a: any, b: any) => 
+      // 🔥 PARCHE: Aseguramos que sean arrays antes de ordenar
+      const prodData = Array.isArray(resProductos.data) ? resProductos.data : [];
+      const servData = Array.isArray(resServicios.data) ? resServicios.data : [];
+
+      const productosOrdenados = prodData.sort((a: any, b: any) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+      setUltimosProductos(productosOrdenados.slice(0, 12));
+      
+      const serviciosOrdenados = servData.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setUltimosServicios(serviciosOrdenados.slice(0, 8));
+      
+      setCargando(false);
+    })
+    .catch((err) => {
+      console.error(err);
+      setCargando(false);
+    });
+  }, []);
       setUltimosProductos(productosOrdenados.slice(0, 12));
       
       const serviciosOrdenados = resServicios.data.sort((a: any, b: any) => 

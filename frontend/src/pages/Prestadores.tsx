@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import ModalServicio from '../components/ModalServicio';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 interface Prestador {
   _id: string;
   nick: string;
@@ -22,9 +24,11 @@ export default function Prestadores() {
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<any | null>(null);
 
   useEffect(() => {
-    axios.get('/api/usuarios/prestadores')
+    axios.get(`${API_URL}/usuarios/prestadores`)
       .then((res) => {
-        setPrestadores(res.data);
+        // 🔥 PARCHE: Aseguramos que sea un array
+        const data = Array.isArray(res.data) ? res.data : [];
+        setPrestadores(data);
         setCargando(false);
       })
       .catch((err) => {
@@ -171,7 +175,6 @@ export default function Prestadores() {
         </div>
       </div>
 
-      {/* 🔥 AQUÍ ESTÁ LA CLAVE: PASAMOS EL TEMA CORAL */}
       {prestadorSeleccionado && (
         <ModalServicio 
           servicio={prestadorSeleccionado} 

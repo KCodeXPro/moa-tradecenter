@@ -3,6 +3,8 @@ import axios from 'axios';
 import ServicioCard from '../components/ServicioCard';
 import ModalServicio from '../components/ModalServicio';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 export interface Servicio {
   _id: string;
   vendedorId?: string;
@@ -47,20 +49,25 @@ export default function Servicios() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('/api/servicios'),
-      axios.get('/api/categorias?tipo=servicio'),
-      axios.get('/api/usuarios')
+      axios.get(`${API_URL}/servicios`),
+      axios.get(`${API_URL}/categorias?tipo=servicio`),
+      axios.get(`${API_URL}/usuarios`)
     ])
       .then(([resServ, resCat, resUsu]) => {
-        setServicios(resServ.data);
+        // 🔥 PARCHE: Aseguramos que todo sean arrays
+        const servData = Array.isArray(resServ.data) ? resServ.data : [];
+        const catData = Array.isArray(resCat.data) ? resCat.data : [];
+        const usuData = Array.isArray(resUsu.data) ? resUsu.data : [];
 
-        const categoriasOrdenadas = resCat.data.sort((a: Categoria, b: Categoria) => 
-          a.nombre.localeCompare(b.nombre)
+        setServicios(servData);
+
+        const categoriasOrdenadas = [...catData].sort((a: Categoria, b: Categoria) => 
+          (a.nombre || '').localeCompare(b.nombre || '')
         );
         setCategorias(categoriasOrdenadas);
 
         const vendedoresMap: VendedorMap = {};
-        resUsu.data.forEach((u: any) => {
+        usuData.forEach((u: any) => {
           if (u._id && u.nick) {
             vendedoresMap[u._id] = u.nick;
           }
@@ -197,7 +204,6 @@ export default function Servicios() {
         </div>
       </div>
       
-      {/* 🔥 AQUÍ LE PASAMOS vistaInicial="contacto" */}
       <ModalServicio 
         servicio={servicioSeleccionado} 
         onClose={() => setServicioSeleccionado(null)} 

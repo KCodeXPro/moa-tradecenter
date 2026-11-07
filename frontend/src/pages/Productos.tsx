@@ -3,6 +3,8 @@ import axios from 'axios';
 import ProductoCard from '../components/ProductoCard';
 import ModalProducto from '../components/ModalProducto';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 interface Producto {
   _id: string;
   vendedorId: string;
@@ -45,21 +47,25 @@ export default function Productos() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('/api/productos'),
-      axios.get('/api/categorias?tipo=producto'),
-      axios.get('/api/usuarios')
+      axios.get(`${API_URL}/productos`),
+      axios.get(`${API_URL}/categorias?tipo=producto`),
+      axios.get(`${API_URL}/usuarios`)
     ])
       .then(([resProd, resCat, resUsu]) => {
-        setProductos(resProd.data);
+        // 🔥 PARCHE: Aseguramos que todo sean arrays
+        const prodData = Array.isArray(resProd.data) ? resProd.data : [];
+        const catData = Array.isArray(resCat.data) ? resCat.data : [];
+        const usuData = Array.isArray(resUsu.data) ? resUsu.data : [];
+
+        setProductos(prodData);
         
-        // 🔥 CAMBIO AQUÍ: Ordenamos las categorías alfabéticamente
-        const categoriasOrdenadas = resCat.data.sort((a: Categoria, b: Categoria) => 
-          a.nombre.localeCompare(b.nombre)
+        const categoriasOrdenadas = [...catData].sort((a: Categoria, b: Categoria) => 
+          (a.nombre || '').localeCompare(b.nombre || '')
         );
         setCategorias(categoriasOrdenadas);
 
         const vendedoresMap: VendedorMap = {};
-        resUsu.data.forEach((u: any) => {
+        usuData.forEach((u: any) => {
           if (u._id && u.nick) {
             vendedoresMap[u._id] = u.nick;
           }
