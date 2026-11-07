@@ -3,6 +3,8 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import ModalServicio from '../components/ModalServicio';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 interface Divisa {
   _id: string;
   vendedorId: string;
@@ -19,9 +21,11 @@ export default function VentaDivisas() {
   const [divisaSeleccionada, setDivisaSeleccionada] = useState<Divisa | null>(null);
 
   useEffect(() => {
-    axios.get('/api/servicios/divisas')
+    axios.get(`${API_URL}/servicios/divisas`)
       .then(res => {
-        setDivisas(res.data);
+        // 🔥 PARCHE: Aseguramos que sea un array
+        const data = Array.isArray(res.data) ? res.data : [];
+        setDivisas(data);
         setCargando(false);
       })
       .catch(err => {
@@ -88,7 +92,6 @@ export default function VentaDivisas() {
                     </p>
                   </div>
                   
-                  {/* 🔥 BOTÓN CAMBIADO Y CON LÓGICA DIRECTA AL CONTACTO */}
                   <button 
                     onClick={() => setDivisaSeleccionada(divisa)}
                     className="w-full inline-flex items-center justify-center gap-2 bg-[#4A7C59] text-white px-4 py-3 rounded-[10px] font-bold hover:bg-[#355A40] transition-colors shadow-sm"
@@ -102,7 +105,6 @@ export default function VentaDivisas() {
         )}
       </div>
 
-      {/* 🔥 LE PASAMOS vistaInicial="contacto" */}
       {divisaSeleccionada && (
         <ModalServicio 
           servicio={divisaSeleccionada as any} 
