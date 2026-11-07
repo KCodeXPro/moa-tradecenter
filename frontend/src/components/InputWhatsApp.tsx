@@ -8,7 +8,19 @@ export default function InputWhatsApp({ value, onChange }: Props) {
   const numero = value.replace('+53', '').trim();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nuevoNumero = e.target.value.replace(/\D/g, ''); // Solo números
+    // Solo números
+    let nuevoNumero = e.target.value.replace(/\D/g, '');
+
+    // 🔥 Limitar a 8 dígitos máximo
+    if (nuevoNumero.length > 8) {
+      nuevoNumero = nuevoNumero.slice(0, 8);
+    }
+
+    // 🔥 El primer dígito debe ser 5 o 6 (móvil cubano)
+    if (nuevoNumero.length > 0 && !['5', '6'].includes(nuevoNumero[0])) {
+      return; // No actualizamos si el primer dígito no es válido
+    }
+
     onChange(`+53${nuevoNumero}`);
   };
 
@@ -21,7 +33,8 @@ export default function InputWhatsApp({ value, onChange }: Props) {
         type="tel"
         value={numero}
         onChange={handleChange}
-        placeholder="5XXXXXXX"
+        placeholder="5XXXXXXX (8 dígitos)"
+        maxLength={8}
         className="w-full px-3 py-2 rounded-r-[10px] border border-[#D9D4CC] focus:border-[#A63A2B] outline-none"
       />
     </div>
