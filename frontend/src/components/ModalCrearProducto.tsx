@@ -19,7 +19,8 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
   const [tipoVenta, setTipoVenta] = useState('minorista');
   
   const [categoria, setCategoria] = useState('ropa'); 
-  const [categoriaId, setCategoriaId] = useState('6ae6ad64eb41b7bc255827a1'); 
+  const [categoriaId, setCategoriaId] = useState(''); // 🔥 Inicializado vacío
+  const [categorias, setCategorias] = useState<any[]>([]); // 🔥 Estado para las categorías
   
   const [publico, setPublico] = useState('mujer'); 
   const [colorSeleccionado, setColorSeleccionado] = useState('Negro');
@@ -32,10 +33,23 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
   const [cargando, setCargando] = useState(false);
   const [usuario, setUsuario] = useState<any>(null);
 
+  // 🔥 CARGAR CATEGORÍAS Y DATOS DEL USUARIO AL ABRIR EL MODAL
   useEffect(() => {
     if (isOpen) {
       const saved = localStorage.getItem('moa_user');
       if (saved) setUsuario(JSON.parse(saved));
+
+      // Cargar categorías desde el backend
+      axios.get(`${API_URL}/categorias?tipo=producto`)
+        .then(res => {
+          const catData = Array.isArray(res.data) ? res.data : [];
+          setCategorias(catData);
+          // Si no hay categoría seleccionada, seleccionar la primera
+          if (!categoriaId && catData.length > 0) {
+            setCategoriaId(catData[0]._id);
+          }
+        })
+        .catch(err => console.error("Error cargando categorías:", err));
 
       if (productoAEditar) {
         setNombre(productoAEditar.nombre || '');
@@ -69,9 +83,13 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
     return [];
   };
 
+  // 🔥 CORREGIDO: Permite añadir variantes sin talla (para motorinas, etc.)
   const handleAddVariante = () => {
-    if (!tallaSeleccionada || parseInt(cantidad) <= 0) return;
-    setVariantes([...variantes, { color: colorSeleccionado, talla: tallaSeleccionada, cantidad: parseInt(cantidad) }]);
+    if (parseInt(cantidad) <= 0) return;
+    // Si no hay talla seleccionada, usamos "Única" como talla por defecto
+    const tallaFinal = tallaSeleccionada || 'Única';
+    
+    setVariantes([...variantes, { color: colorSeleccionado, talla: tallaFinal, cantidad: parseInt(cantidad) }]);
     setTallaSeleccionada('');
     setCantidad('1');
   };
@@ -94,8 +112,6 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 🔥 Se eliminó la validación que exigía variantes obligatorias.
 
     if (!usuario || !usuario.whatsapp) {
       alert("Por favor, completa tu perfil con tu WhatsApp antes de publicar un producto.");
@@ -163,15 +179,31 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
             <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} className="w-full px-3 py-2 rounded-[10px] border border-[#D9D4CC] focus:border-[#A63A2B] outline-none h-16 resize-none" />
           </div>
 
+          {/* 🔥 SELECTOR DE CATEGORÍA CORREGIDO */}
+          <div>
+            <label className="block text-sm font-semibold text-[#6B6B6B] mb-1">Categoría del Producto</label>
+            <select 
+              value={categoriaId} 
+              onChange={e => setCategoriaId(e.target.value)} 
+              className="w-full px-3 py-2 rounded-[10px] border border-[#D9D4CC] focus:border-[#A63A2B] outline-none"
+            >
+              <option value="">-- Selecciona una categoría --</option>
+              {categorias.map(cat => (
+                <option key={cat._id} value={cat._id}>{cat.icono} {cat.nombre}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-[10px] border border-[#D9D4CC]">
             <h3 className="font-bold text-[#2C2C2C] mb-3">Variantes del producto (Opcional)</h3>
             
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div>
-                <label className="block text-xs font-semibold text-[#6B6B6B] mb-1">Categoría</label>
+                <label className="block text-xs font-semibold text-[#6B6B6B] mb-1">Categoría (Tipo)</label>
                 <select value={categoria} onChange={e => {setCategoria(e.target.value); setTallaSeleccionada('');}} className="w-full px-2 py-2 rounded-[8px] border border-[#D9D4CC] text-sm">
                   <option value="ropa">Ropa</option>
                   <option value="calzado">Calzado</option>
+                  <option value="otro">Otro (sin talla)</option>
                 </select>
               </div>
               <div>
@@ -180,6 +212,7 @@ export default function ModalCrearProducto({ isOpen, onClose, onCreated, product
                   <option value="mujer">Mujer</option>
                   <option value="hombre">Hombre</option>
                   <option value="niño">Niño</option>
+                  <option value="unisex">Unisex</option>
                 </select>
               </div>
             </div>
