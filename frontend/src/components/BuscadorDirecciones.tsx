@@ -35,9 +35,11 @@ interface Direccion {
   nick?: string;
   categoriaId?: string;
   icono?: string;
+  vendedorId?: string; // 🔥 Añadido para el filtro
 }
 
 interface NegocioPublico {
+  _id: string; // 🔥 Añadido para el filtro
   nick: string;
   icono?: string;
   ubicacion: {
@@ -98,8 +100,7 @@ export default function BuscadorDirecciones() {
 
       const dirData = Array.isArray(resDir.data) ? resDir.data : [];
       const dirsConIcono = dirData.map((d: any) => {
-        // Lógica: Si tiene categoría, usa su icono. Si no, pero tiene nick, usa tienda. Si no tiene nick, usa casa.
-        let iconoAsignado = '🏠'; // Por defecto: casa
+        let iconoAsignado = '🏠';
         if (d.categoriaId) {
           iconoAsignado = catMap[d.categoriaId] || '🏪';
         } else if (d.nick) {
@@ -134,7 +135,6 @@ export default function BuscadorDirecciones() {
     if (val.trim().length > 0) setNumero('');
   };
 
-  // 🔥 FORMULARIO 1: Buscar por enlace/nick (Modificado para buscar en negocios)
   const buscarPorEnlace = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -165,7 +165,8 @@ export default function BuscadorDirecciones() {
           lat: negocio.ubicacion.lat,
           lon: negocio.ubicacion.lon,
           nick: negocio.nick,
-          icono: '👤'
+          icono: '👤',
+          vendedorId: negocio._id // 🔥 Guardamos el ID del vendedor
         }]);
       } else {
         setError('No se encontró la ubicación pública de este vendedor.');
@@ -178,7 +179,6 @@ export default function BuscadorDirecciones() {
     }
   };
 
-  // 🔥 FORMULARIO 2: Buscar por Nombre de Negocio (CORREGIDO)
   const buscarPorNombre = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -191,12 +191,10 @@ export default function BuscadorDirecciones() {
 
     setCargando(true);
     try {
-      // Buscamos en las direcciones admin
       const filtradosAdmin = direccionesAdmin.filter((d: any) => 
         d.nick && d.nick.toLowerCase().includes(busquedaNombre.toLowerCase())
       );
 
-      // También buscamos en los negocios públicos (vendedores)
       const filtradosVendedores = negociosPublicos
         .filter((n: any) => n.nick.toLowerCase().includes(busquedaNombre.toLowerCase()) && n.ubicacion?.lat)
         .map((n: any) => ({
@@ -209,7 +207,8 @@ export default function BuscadorDirecciones() {
           lat: n.ubicacion.lat,
           lon: n.ubicacion.lon,
           nick: n.nick,
-          icono: n.icono || '👤'
+          icono: n.icono || '👤',
+          vendedorId: n._id // 🔥 Guardamos el ID del vendedor
         }));
 
       const todosLosResultados = [...filtradosAdmin, ...filtradosVendedores];
@@ -227,7 +226,6 @@ export default function BuscadorDirecciones() {
     }
   };
 
-  // 🔥 FORMULARIO 3: Buscar por Dirección (Se mantiene igual)
   const handleBuscarDireccion = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -254,7 +252,6 @@ export default function BuscadorDirecciones() {
     setCargando(true);
 
     try {
-      // Buscamos en las direcciones admin localmente en lugar de hacer otra petición
       const filtrados = direccionesAdmin.filter((d: any) => {
         const matchCalle = d.calle?.toLowerCase().includes(calle.toLowerCase());
         const matchReparto = d.reparto?.toLowerCase().includes(reparto.toLowerCase());
@@ -289,7 +286,6 @@ export default function BuscadorDirecciones() {
         
         <div className="space-y-6">
           
-          {/* 🔥 FORMULARIO 1: ENLACE/NICK */}
           <form onSubmit={buscarPorEnlace} className="bg-white p-5 rounded-[16px] border border-[#E5E7EB] shadow-sm">
             <h3 className="text-sm font-bold text-[#2E6B8A] mb-2 flex items-center gap-2">
               🔗 Buscar por enlace compartido
@@ -308,7 +304,6 @@ export default function BuscadorDirecciones() {
             </div>
           </form>
 
-          {/* 🔥 FORMULARIO 2: NOMBRE DE NEGOCIO */}
           <form onSubmit={buscarPorNombre} className="bg-white p-5 rounded-[16px] border border-[#E5E7EB] shadow-sm">
             <h3 className="text-sm font-bold text-[#2E6B8A] mb-2 flex items-center gap-2">
               🏪 Buscar por nombre de negocio
@@ -327,7 +322,6 @@ export default function BuscadorDirecciones() {
             </div>
           </form>
 
-          {/* 🔥 FORMULARIO 3: DIRECCIÓN EXACTA */}
           <form onSubmit={handleBuscarDireccion} className="bg-white p-6 rounded-[16px] border border-[#E5E7EB] shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2 border-b border-gray-100 pb-2 mb-1">
               <h3 className="text-sm font-bold text-[#2E6B8A] flex items-center gap-2">
@@ -419,6 +413,14 @@ export default function BuscadorDirecciones() {
                   <p>{dir.calle} {dir.numero ? `#${dir.numero}` : ''}</p>
                   {dir.edificio && <p>Edificio: {dir.edificio}</p>}
                   {dir.reparto && <p>Reparto: {dir.reparto}</p>}
+                  
+                  {/* 🔥 ENLACES PARA FILTRAR */}
+                  {dir.vendedorId && (
+                    <div className="flex gap-2 mt-2">
+                      <Link to={`/productos?vendedorId=${dir.vendedorId}`} className="text-[#A63A2B] font-bold underline text-sm">Ver Productos</Link>
+                      <Link to={`/servicios?vendedorId=${dir.vendedorId}`} className="text-[#4A7C59] font-bold underline text-sm">Ver Servicios</Link>
+                    </div>
+                  )}
                 </Popup>
               </Marker>
             ))}
@@ -430,7 +432,12 @@ export default function BuscadorDirecciones() {
                     <strong>{negocio.icono} {negocio.nick}</strong>
                     <p>{negocio.ubicacion.calle} {negocio.ubicacion.numero ? `#${negocio.ubicacion.numero}` : ''}</p>
                     {negocio.ubicacion.reparto && <p>Reparto: {negocio.ubicacion.reparto}</p>}
-                    <Link to={`/ubicacion/${negocio.nick}`} className="text-[#2E6B8A] font-bold underline text-sm mt-1 inline-block">Ver mi ubicación</Link>
+                    
+                    {/* 🔥 ENLACES PARA FILTRAR */}
+                    <div className="flex gap-2 mt-2">
+                      <Link to={`/productos?vendedorId=${negocio._id}`} className="text-[#A63A2B] font-bold underline text-sm">Ver Productos</Link>
+                      <Link to={`/servicios?vendedorId=${negocio._id}`} className="text-[#4A7C59] font-bold underline text-sm">Ver Servicios</Link>
+                    </div>
                   </Popup>
                 </Marker>
               )
@@ -442,6 +449,14 @@ export default function BuscadorDirecciones() {
                   <strong>{dir.icono} {dir.nick ? dir.nick : `${dir.calle} ${dir.numero ? `#${dir.numero}` : ''}`}</strong>
                   <p>{dir.calle} {dir.numero ? `#${dir.numero}` : ''}</p>
                   {dir.reparto && <p>Reparto: {dir.reparto}</p>}
+                  
+                  {/* 🔥 ENLACES PARA FILTRAR */}
+                  {dir.vendedorId && (
+                    <div className="flex gap-2 mt-2">
+                      <Link to={`/productos?vendedorId=${dir.vendedorId}`} className="text-[#A63A2B] font-bold underline text-sm">Ver Productos</Link>
+                      <Link to={`/servicios?vendedorId=${dir.vendedorId}`} className="text-[#4A7C59] font-bold underline text-sm">Ver Servicios</Link>
+                    </div>
+                  )}
                 </Popup>
               </Marker>
             ))}

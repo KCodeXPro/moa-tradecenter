@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom'; // 🔥 Añadido
 import axios from 'axios';
 import ProductoCard from '../components/ProductoCard';
 import ModalProducto from '../components/ModalProducto';
@@ -39,7 +40,6 @@ export default function Productos() {
   const [error, setError] = useState<string | null>(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
 
-  // 🔥 Estados de paginación
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
@@ -50,24 +50,36 @@ export default function Productos() {
   const [filtroDomicilio, setFiltroDomicilio] = useState(false);
   const [filtroCategoria, setFiltroCategoria] = useState('todas');
 
-  // 🔥 Función para cargar productos (con paginación)
+  // 🔥 LEER PARÁMETRO DE LA URL
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
+  const vendedorIdFiltro = searchParams.get('vendedorId');
+
   const cargarProductos = async (pageNumber: number) => {
     if (pageNumber === 1) setCargando(true);
     else setCargandoMas(true);
 
     try {
-      const resProd = await axios.get(`${API_URL}/productos?page=${pageNumber}&limit=10`);
+      const url = vendedorIdFiltro 
+        ? `${API_URL}/productos?vendedorId=${vendedorIdFiltro}` 
+        : `${API_URL}/productos?page=${pageNumber}&limit=10`;
       
-      // El backend ahora devuelve un objeto { data, total, page, totalPages }
-      const { data, totalPages } = resProd.data;
-
-      if (pageNumber === 1) {
-        setProductos(data);
+      const resProd = await axios.get(url);
+      
+      // Si hay vendedorId, el backend devuelve un array directamente
+      if (vendedorIdFiltro) {
+        setProductos(resProd.data);
+        setHasMore(false); // No hay paginación cuando filtramos por vendedor
       } else {
-        setProductos(prev => [...prev, ...data]);
+        const { data, totalPages } = resProd.data;
+        if (pageNumber === 1) {
+          setProductos(data);
+        } else {
+          setProductos(prev => [...prev, ...data]);
+        }
+        setHasMore(pageNumber < totalPages);
       }
-
-      setHasMore(pageNumber < totalPages);
     } catch (err) {
       console.error(err);
       setError('No se pudieron cargar los productos.');
@@ -78,7 +90,6 @@ export default function Productos() {
   };
 
   useEffect(() => {
-    // Cargamos los datos iniciales (categorías y vendedores)
     Promise.all([
       axios.get(`${API_URL}/categorias?tipo=producto`),
       axios.get(`${API_URL}/usuarios`)
@@ -91,16 +102,14 @@ export default function Productos() {
       usuData.forEach((u: any) => { if (u._id && u.nick) vendedoresMap[u._id] = u.nick; });
       setVendedores(vendedoresMap);
 
-      // Cargamos la primera página de productos
       cargarProductos(1);
     }).catch((err) => {
       console.error(err);
       setError('No se pudieron cargar los datos.');
       setCargando(false);
     });
-  }, []);
+  }, [vendedorIdFiltro]); // 🔥 Se vuelve a ejecutar si cambia el vendedorId
 
-  // 🔥 Filtros aplicados solo a los productos cargados (los que se ven)
   const productosFiltrados = useMemo(() => {
     let result = [...productos];
     if (busqueda) result = result.filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
@@ -193,6 +202,15 @@ export default function Productos() {
           <div className="w-full min-w-0 pb-8">
             <div className="flex flex-col items-center justify-center text-center mb-10">
               <h2 className="text-3xl font-extrabold text-[#2C2C2C] mb-2 tracking-tight">Productos en Moa</h2>
+              
+              {/* 🔥 AVISO DE FILTRO POR VENDEDOR */}
+              {vendedorIdFiltro && (
+                <div className="bg-[#FEE2E2] border border-[#A63A2B]/20 px-4 py-2 rounded-full mb-4 flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#A63A2B]">Mostrando productos de un negocio específico</span>
+                  <button onClick={() => navigate('/productos')} className="text-xs bg-[#A63A2B] text-white px-2 py-1 rounded-full font-bold hover:bg-[#7A2A1F]">Ver todos</button>
+                </div>
+              )}
+
               <span className="text-sm font-bold text-[#A63A2B] bg-[#FEE2E2] border border-[#A63A2B]/20 px-4 py-1.5 rounded-full">
                 {productosFiltrados.length} resultados
               </span>
@@ -201,12 +219,11 @@ export default function Productos() {
             {productosFiltrados.length === 0 ? (
               <div className="bg-white rounded-[24px] border border-[#D9D4CC] p-12 text-center w-full min-h-[60vh] shadow-sm">
                 <p className="text-[#6B6B6B] text-lg mb-4">No se encontraron productos con estos filtros.</p>
-                <button onClick={() => { setBusqueda(''); setBusquedaVendedor(''); setFiltroTipo('todos'); setFiltroDomicilio(false); setFiltroCategoria('todas'); }} className="bg-[#A63A2B] text-white px-6 py-3 rounded-[10px] font-bold text-sm hover:bg-[#7A2A1F] transition-colors">
+                <button onClick={() => { setBusqueda(''); setBusquedaVendedor(''); setFiltroTipo('todos'); setFiltroDomicilio(false); setFiltroCategoria('todas'); if (vendedorIdFiltro) navigate('/productos'); }} className="bg-[#A63A2B] text-white px-6 py-3 rounded-[10px] font-bold text-sm hover:bg-[#7A2A1F] transition-colors">
                   Limpiar filtros
                 </button>
               </div>
             ) : (
-              // 🔥 CAMBIO: Una sola columna con espacio vertical
               <div className="space-y-4">
                 {productosFiltrados.map(prod => (
                   <ProductoCard key={prod._id} producto={prod} onSelect={setProductoSeleccionado} />
@@ -214,8 +231,7 @@ export default function Productos() {
               </div>
             )}
 
-            {/* 🔥 BOTÓN CARGAR MÁS */}
-            {hasMore && (
+            {hasMore && !vendedorIdFiltro && (
               <div className="mt-8 text-center">
                 <button 
                   onClick={() => {

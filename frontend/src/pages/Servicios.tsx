@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom'; // 🔥 Añadido
 import axios from 'axios';
 import ServicioCard from '../components/ServicioCard';
 import ModalServicio from '../components/ModalServicio';
@@ -42,7 +43,6 @@ export default function Servicios() {
   const [error, setError] = useState<string | null>(null);
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
 
-  // 🔥 Estados de paginación
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
@@ -51,22 +51,35 @@ export default function Servicios() {
   const [filtroOrden, setFiltroOrden] = useState('recientes');
   const [filtroCategoria, setFiltroCategoria] = useState('todas');
 
-  // 🔥 Función para cargar servicios (con paginación)
+  // 🔥 LEER PARÁMETRO DE LA URL
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
+  const vendedorIdFiltro = searchParams.get('vendedorId');
+
   const cargarServicios = async (pageNumber: number) => {
     if (pageNumber === 1) setCargando(true);
     else setCargandoMas(true);
 
     try {
-      const resServ = await axios.get(`${API_URL}/servicios?page=${pageNumber}&limit=10`);
-      const { data, totalPages } = resServ.data;
+      const url = vendedorIdFiltro 
+        ? `${API_URL}/servicios?vendedorId=${vendedorIdFiltro}` 
+        : `${API_URL}/servicios?page=${pageNumber}&limit=10`;
+      
+      const resServ = await axios.get(url);
 
-      if (pageNumber === 1) {
-        setServicios(data);
+      if (vendedorIdFiltro) {
+        setServicios(resServ.data);
+        setHasMore(false);
       } else {
-        setServicios(prev => [...prev, ...data]);
+        const { data, totalPages } = resServ.data;
+        if (pageNumber === 1) {
+          setServicios(data);
+        } else {
+          setServicios(prev => [...prev, ...data]);
+        }
+        setHasMore(pageNumber < totalPages);
       }
-
-      setHasMore(pageNumber < totalPages);
     } catch (err) {
       console.error(err);
       setError('No se pudieron cargar los servicios.');
@@ -95,7 +108,7 @@ export default function Servicios() {
       setError('No se pudieron cargar los datos.');
       setCargando(false);
     });
-  }, []);
+  }, [vendedorIdFiltro]);
 
   const serviciosFiltrados = useMemo(() => {
     let result = [...servicios];
@@ -178,6 +191,15 @@ export default function Servicios() {
           <div className="w-full min-w-0 pb-8">
             <div className="flex flex-col items-center justify-center text-center mb-10">
               <h2 className="text-3xl font-extrabold text-[#2C2C2C] mb-2 tracking-tight">Servicios en Moa</h2>
+              
+              {/* 🔥 AVISO DE FILTRO POR VENDEDOR */}
+              {vendedorIdFiltro && (
+                <div className="bg-[#E0F2FE] border border-[#2E6B8A]/20 px-4 py-2 rounded-full mb-4 flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#2E6B8A]">Mostrando servicios de un negocio específico</span>
+                  <button onClick={() => navigate('/servicios')} className="text-xs bg-[#2E6B8A] text-white px-2 py-1 rounded-full font-bold hover:bg-[#1F4B61]">Ver todos</button>
+                </div>
+              )}
+
               <span className="text-sm font-bold text-[#2E6B8A] bg-[#E0F2FE] border border-[#2E6B8A]/20 px-4 py-1.5 rounded-full">
                 {serviciosFiltrados.length} resultados
               </span>
@@ -186,12 +208,11 @@ export default function Servicios() {
             {serviciosFiltrados.length === 0 ? (
               <div className="bg-white rounded-[24px] border border-[#D9D4CC] p-12 text-center w-full min-h-[60vh] shadow-sm">
                 <p className="text-[#6B6B6B] text-lg mb-4">No se encontraron servicios con estos filtros.</p>
-                <button onClick={() => { setBusqueda(''); setBusquedaVendedor(''); setFiltroCategoria('todas'); }} className="bg-[#2E6B8A] text-white px-6 py-3 rounded-[10px] font-bold text-sm hover:bg-[#1F4B61] transition-colors">
+                <button onClick={() => { setBusqueda(''); setBusquedaVendedor(''); setFiltroCategoria('todas'); if (vendedorIdFiltro) navigate('/servicios'); }} className="bg-[#2E6B8A] text-white px-6 py-3 rounded-[10px] font-bold text-sm hover:bg-[#1F4B61] transition-colors">
                   Limpiar filtros
                 </button>
               </div>
             ) : (
-              // 🔥 CAMBIO: Una sola columna con espacio vertical
               <div className="space-y-4">
                 {serviciosFiltrados.map(serv => (
                   <ServicioCard key={serv._id} servicio={serv} onSelect={(s) => setServicioSeleccionado(s)} />
@@ -199,8 +220,7 @@ export default function Servicios() {
               </div>
             )}
 
-            {/* 🔥 BOTÓN CARGAR MÁS */}
-            {hasMore && (
+            {hasMore && !vendedorIdFiltro && (
               <div className="mt-8 text-center">
                 <button 
                   onClick={() => {
