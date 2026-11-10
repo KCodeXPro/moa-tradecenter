@@ -71,7 +71,7 @@ export default function ComoFunciona() {
               <div className="flex gap-6">
                 <div className="w-12 h-12 rounded-2xl bg-[#FEE2E2] flex items-center justify-center text-xl font-extrabold text-[#A63A2B] shrink-0">1</div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#2C2C2C] mb-2">Explora el catálogo o busca una dirección</h3>
+                  <h3 className="text-lg font-bold text-[#2C2C2C] mb-2">Explora el directorio o busca una dirección</h3>
                   <p className="text-[#6B6B6B] leading-relaxed">Navega por los productos y servicios disponibles. También puedes usar nuestro <strong>Buscador de Direcciones</strong> para encontrar cualquier calle, edificio o reparto en Moa y ver los negocios cercanos.</p>
                 </div>
               </div>
