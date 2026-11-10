@@ -54,13 +54,7 @@ export default function ModalCompletarPerfil({ isOpen, onClose, usuario, onSucce
 
       await axios.patch(`/api/usuarios/${usuario._id}/perfil`, payload);
 
-      const usuarioActualizado = { 
-        ...usuario, 
-        whatsapp, 
-        esPrestador: esRepartidor,
-        tarifaDomicilio: esRepartidor ? Number(tarifaDomicilio) * 100 : 0
-      };
-      localStorage.setItem('moa_user', JSON.stringify(usuarioActualizado));
+      // 🔥 Llamamos a onSuccess() que recargará el usuario desde el backend
       onSuccess();
       onClose();
     } catch (err: any) {

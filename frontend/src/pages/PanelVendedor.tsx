@@ -32,7 +32,18 @@ export default function PanelVendedor() {
         navigate('/');
         return;
       }
-      setUsuario(user);
+      
+      // 🔥 NUEVO: Pedimos los datos frescos al backend
+      axios.get(`/api/usuarios/${user._id}`)
+        .then(res => {
+          const usuarioFresco = res.data;
+          localStorage.setItem('moa_user', JSON.stringify(usuarioFresco));
+          setUsuario(usuarioFresco);
+        })
+        .catch(err => {
+          console.error("Error cargando usuario", err);
+          setUsuario(user); // Fallback al localStorage
+        });
 
       const userId = user._id;
 
@@ -50,6 +61,21 @@ export default function PanelVendedor() {
       navigate('/');
     }
   }, [navigate]);
+
+  // 🔥 NUEVO: Función para recargar el usuario después de actualizar el perfil
+  const recargarUsuario = () => {
+    const saved = localStorage.getItem('moa_user');
+    if (saved) {
+      const user = JSON.parse(saved);
+      axios.get(`/api/usuarios/${user._id}`)
+        .then(res => {
+          const usuarioFresco = res.data;
+          localStorage.setItem('moa_user', JSON.stringify(usuarioFresco));
+          setUsuario(usuarioFresco);
+        })
+        .catch(err => console.error("Error recargando usuario", err));
+    }
+  };
 
   const copiarEnlaceUbicacion = () => {
     const url = `${window.location.origin}/ubicacion/${usuario.nick}`;
@@ -317,7 +343,7 @@ export default function PanelVendedor() {
         isOpen={isModalPerfilOpen}
         onClose={() => setIsModalPerfilOpen(false)}
         usuario={usuario}
-        onSuccess={() => window.location.reload()}
+        onSuccess={recargarUsuario}
       />
 
       <ModalMiUbicacion
