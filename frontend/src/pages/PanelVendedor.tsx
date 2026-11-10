@@ -110,14 +110,16 @@ export default function PanelVendedor() {
           <p className="text-[#6B6B6B]">Gestiona tu catálogo de productos y servicios.</p>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
-          {!tieneWhatsapp && (
-            <button 
-              className="bg-[#B83A2E] hover:bg-[#991B1B] text-white px-5 py-2.5 rounded-[10px] font-bold transition-colors shadow-sm" 
-              onClick={() => setIsModalPerfilOpen(true)}
-            >
-              ⚠️ Completar Perfil
-            </button>
-          )}
+          <button 
+            className={`px-5 py-2.5 rounded-[10px] font-bold transition-colors shadow-sm ${
+              tieneWhatsapp 
+                ? 'bg-gray-200 hover:bg-gray-300 text-[#2C2C2C]' 
+                : 'bg-[#B83A2E] hover:bg-[#991B1B] text-white'
+            }`}
+            onClick={() => setIsModalPerfilOpen(true)}
+          >
+            {tieneWhatsapp ? '⚙️ Editar Perfil' : '⚠️ Completar Perfil'}
+          </button>
           <button 
             className="bg-[#2E6B8A] hover:bg-[#1f4a60] text-white px-5 py-2.5 rounded-[10px] font-bold transition-colors shadow-sm" 
             onClick={() => setIsModalUbicacionOpen(true)}

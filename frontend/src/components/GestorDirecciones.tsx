@@ -60,6 +60,7 @@ export default function GestorDirecciones() {
   const [cargando, setCargando] = useState(true);
 
   const mapRef = useRef<L.Map | null>(null);
+  
   const [direccionEnfocada, setDireccionEnfocada] = useState<string | null>(null);
 
   const cargarTodo = () => {

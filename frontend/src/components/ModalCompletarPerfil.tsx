@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import InputWhatsApp from './InputWhatsApp';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  usuario: { _id: string; nick: string; whatsapp?: string };
+  usuario: { _id: string; nick: string; whatsapp?: string; esPrestador?: boolean; tarifaDomicilio?: number };
   onSuccess: () => void;
 }
 
@@ -15,12 +15,18 @@ export default function ModalCompletarPerfil({ isOpen, onClose, usuario, onSucce
   const [tarifaDomicilio, setTarifaDomicilio] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Validación del WhatsApp en tiempo real (empieza con 5 o 6, y tiene 8 dígitos en total)
-  const esWhatsappValido = /^\+53\s?[56]\d{7}$/.test(whatsapp);
+  // 🔥 CARGAR DATOS DEL USUARIO AL ABRIR EL MODAL
+  useEffect(() => {
+    if (isOpen && usuario) {
+      setWhatsApp(usuario.whatsapp || '');
+      setEsRepartidor(usuario.esPrestador || false);
+      setTarifaDomicilio(usuario.tarifaDomicilio ? (usuario.tarifaDomicilio / 100).toString() : '');
+      setError(null);
+    }
+  }, [isOpen, usuario]);
 
-  // El botón se deshabilita si:
-  // 1. El WhatsApp no es válido
-  // 2. Es repartidor y no ha puesto tarifa (o es <= 0)
+  // Validación del WhatsApp en tiempo real
+  const esWhatsappValido = /^\+53\s?[56]\d{7}$/.test(whatsapp);
   const formularioInvalido = !esWhatsappValido || (esRepartidor && (!tarifaDomicilio || Number(tarifaDomicilio) <= 0));
 
   if (!isOpen) return null;
@@ -62,11 +68,16 @@ export default function ModalCompletarPerfil({ isOpen, onClose, usuario, onSucce
     }
   };
 
+  // 🔥 Determinar si es la primera vez o una actualización
+  const esPrimeraVez = !usuario.whatsapp;
+
   return (
     <div className="fixed inset-0 bg-[#2C2C2C]/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className="bg-white rounded-[20px] max-w-md w-full p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-extrabold text-[#2C2C2C]">Completar Perfil</h2>
+          <h2 className="text-2xl font-extrabold text-[#2C2C2C]">
+            {esPrimeraVez ? 'Completar Perfil' : 'Editar Perfil'}
+          </h2>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F5F0E8] text-[#2C2C2C] hover:bg-[#E8E2D9]">✕</button>
         </div>
 
@@ -77,7 +88,7 @@ export default function ModalCompletarPerfil({ isOpen, onClose, usuario, onSucce
               value={whatsapp} 
               onChange={(val) => {
                 setWhatsApp(val);
-                setError(null); // Limpiamos el error si el usuario está escribiendo
+                setError(null);
               }} 
             />
             {!esWhatsappValido && whatsapp.length > 0 && (
@@ -131,7 +142,7 @@ export default function ModalCompletarPerfil({ isOpen, onClose, usuario, onSucce
                   : 'bg-[#A63A2B] hover:bg-[#7A2A1F] text-white'
               }`}
             >
-              Guardar Perfil
+              {esPrimeraVez ? 'Guardar Perfil' : 'Actualizar Perfil'}
             </button>
           </div>
         </form>
