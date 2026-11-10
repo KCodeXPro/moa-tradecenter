@@ -1,282 +1,276 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
-interface Producto {
-  _id: string;
-  vendedorId: string;
-  nombre: string;
-  descripcion: string;
-  precio: number;
-  tipoVenta: string;
-  tieneDomicilio: boolean;
-  imagenes?: string[];
-  variantes?: { color: string; talla: string; cantidad: number }[];
-  whatsapp?: string; 
-}
-
-interface Prestador {
-  _id: string;
-  nick: string;
-  whatsapp: string;
-  tarifaDomicilio: number;
-  disponible: boolean;
-}
-
-type ModalVista =
-  | null
-  | 'mensaje'
-  | 'domicilio-whatsapp'
-  | 'domicilio-resumen'
-  | 'exito';
-
 interface Props {
-  producto: Producto | null;
+  isOpen: boolean;
   onClose: () => void;
+  onCreated: () => void;
+  productoAEditar?: any | null;
 }
 
-export default function ModalProducto({ producto, onClose }: Props) {
-  const [imagenActiva, setImagenActiva] = useState(0);
-  const [vista, setVista] = useState<ModalVista>(null);
-  const [textoMensaje, setTextoMensaje] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [ultimaAccion, setUltimaAccion] = useState<'mensaje' | 'domicilio' | null>(null);
-  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
-  const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<Prestador | null>(null);
-  const [prestadoresCargando, setPrestadoresCargando] = useState(false);
+const COLORES_DISPONIBLES = ['Negro', 'Blanco', 'Azul', 'Rojo', 'Verde', 'Marrón', 'Gris', 'Plateado', 'Rosa', 'Amarillo'];
 
-  // 🔥 MENSAJE PREDEFINIDO AL ABRIR EL MODAL
+export default function ModalCrearProducto({ isOpen, onClose, onCreated, productoAEditar }: Props) {
+  const [nombre, setNombre] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [precio, setPrecio] = useState('');
+  const [tipoVenta, setTipoVenta] = useState('minorista');
+  
+  const [categoria, setCategoria] = useState('ropa'); 
+  const [categoriaId, setCategoriaId] = useState(''); // 🔥 Inicializado vacío
+  const [categorias, setCategorias] = useState<any[]>([]); // 🔥 Estado para las categorías
+  
+  const [publico, setPublico] = useState('mujer'); 
+  const [colorSeleccionado, setColorSeleccionado] = useState('Negro');
+  const [tallaSeleccionada, setTallaSeleccionada] = useState('');
+  const [cantidad, setCantidad] = useState('1');
+  const [variantes, setVariantes] = useState<{ color: string; talla: string; cantidad: number }[]>([]);
+
+  const [imagenesBase64, setImagenesBase64] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cargando, setCargando] = useState(false);
+  const [usuario, setUsuario] = useState<any>(null);
+
+  // 🔥 CARGAR CATEGORÍAS Y DATOS DEL USUARIO AL ABRIR EL MODAL
   useEffect(() => {
-    setImagenActiva(0);
-    setVista(null);
-    setError(null);
-    setPrestadorSeleccionado(null);
-    if (producto) {
-      setTextoMensaje(`Hola, estoy interesado en el producto "${producto.nombre}". ¿Sigue disponible?`);
-    } else {
-      setTextoMensaje('');
+    if (isOpen) {
+      const saved = localStorage.getItem('moa_user');
+      if (saved) setUsuario(JSON.parse(saved));
+
+      // Cargar categorías desde el backend
+      axios.get(`${API_URL}/categorias?tipo=producto`)
+        .then(res => {
+          const catData = Array.isArray(res.data) ? res.data : [];
+          setCategorias(catData);
+          // Si no hay categoría seleccionada, seleccionar la primera
+          if (!categoriaId && catData.length > 0) {
+            setCategoriaId(catData[0]._id);
+          }
+        })
+        .catch(err => console.error("Error cargando categorías:", err));
+
+      if (productoAEditar) {
+        setNombre(productoAEditar.nombre || '');
+        setDescripcion(productoAEditar.descripcion || '');
+        setPrecio((productoAEditar.precio / 100).toString());
+        setTipoVenta(productoAEditar.tipoVenta || 'minorista');
+        setCategoriaId(productoAEditar.categoriaId || '');
+        setVariantes(productoAEditar.variantes || []);
+        setImagenesBase64(productoAEditar.imagenes || []);
+      } else {
+        setNombre(''); setDescripcion(''); setPrecio(''); setTipoVenta('minorista');
+        setVariantes([]); setImagenesBase64([]);
+      }
     }
-  }, [producto]);
+  }, [isOpen, productoAEditar]);
 
-  if (!producto) return null;
+  if (!isOpen) return null;
 
-  const tieneImagenes = producto.imagenes && producto.imagenes.length > 0;
-  const fotoPrincipal = tieneImagenes ? producto.imagenes![imagenActiva] : null;
-  const precioFormateado = (producto.precio / 100).toFixed(2);
-
-  // 🔥 MENSAJE PREDEFINIDO AL HACER CLIC EN "MENSAJE"
-  const abrirMensaje = () => {
-    setError(null);
-    setTextoMensaje(`Hola, estoy interesado en el producto "${producto.nombre}". ¿Sigue disponible?`);
-    setVista('mensaje');
+  const getTallas = () => {
+    if (categoria === 'calzado') {
+      if (publico === 'mujer') return ['35', '36', '37', '38', '39', '40', '41', '42'];
+      if (publico === 'hombre') return ['39', '40', '41', '42', '43', '44', '45', '46', '47'];
+      if (publico === 'niño') return ['20', '22', '24', '26', '28', '30', '32', '34', '35'];
+    }
+    
+    if (categoria === 'ropa') {
+      if (publico === 'mujer') return ['XS', 'S', 'M', 'L', 'XL', 'XXL', '6-8', '8-10', '10-12', '12-14', '14-16', '16-18'];
+      if (publico === 'hombre') return ['S', 'M', 'L', 'XL', 'XXL', 'XXXL', '28', '30', '32', '34', '36', '38'];
+      if (publico === 'niño') return ['2', '4', '6', '8', '10', '12', '14'];
+    }
+    return [];
   };
 
-  // 🔥 MENSAJE PREDEFINIDO AL HACER CLIC EN "DOMICILIO"
-  const abrirDomicilio = () => {
-    if (!producto.tieneDomicilio) return;
-    setError(null);
-    setTextoMensaje(`Hola, me gustaría solicitar un domicilio para el producto "${producto.nombre}".`);
-    setVista('domicilio-whatsapp');
-    cargarPrestadores();
+  // 🔥 CORREGIDO: Permite añadir variantes sin talla (para motorinas, etc.)
+  const handleAddVariante = () => {
+    if (parseInt(cantidad) <= 0) return;
+    // Si no hay talla seleccionada, usamos "Única" como talla por defecto
+    const tallaFinal = tallaSeleccionada || 'Única';
+    
+    setVariantes([...variantes, { color: colorSeleccionado, talla: tallaFinal, cantidad: parseInt(cantidad) }]);
+    setTallaSeleccionada('');
+    setCantidad('1');
   };
 
-  const cargarPrestadores = async () => {
-    setPrestadoresCargando(true);
-    setPrestadores([]);
+  const removeVariante = (index: number) => {
+    setVariantes(variantes.filter((_, i) => i !== index));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach(file => {
+      if (imagenesBase64.length >= 4) return;
+      const reader = new FileReader();
+      reader.onloadend = () => setImagenesBase64(prev => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!usuario || !usuario.whatsapp) {
+      alert("Por favor, completa tu perfil con tu WhatsApp antes de publicar un producto.");
+      return;
+    }
+
+    setCargando(true);
     try {
-      const res = await axios.get(`${API_URL}/usuarios/prestadores`);
-      setPrestadores(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error(err);
-      setError('No se pudo cargar la lista de prestadores de domicilio.');
+      const vendedorId = usuario._id; 
+      const payload = {
+        nombre, 
+        descripcion, 
+        precio: parseInt(precio) * 100, 
+        tipoVenta, 
+        categoriaId, 
+        vendedorId, 
+        variantes, 
+        tieneDomicilio: true, 
+        imagenes: imagenesBase64, 
+        whatsapp: usuario.whatsapp
+      };
+
+      if (productoAEditar) {
+        await axios.put(`${API_URL}/productos/${productoAEditar._id}`, payload);
+      } else {
+        await axios.post(`${API_URL}/productos`, payload);
+      }
+      
+      onCreated();
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert('Error al guardar el producto');
     } finally {
-      setPrestadoresCargando(false);
+      setCargando(false);
     }
-  };
-
-  const enviarMensaje = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!producto.whatsapp) {
-      setError('El vendedor no tiene un WhatsApp registrado en este producto.');
-      return;
-    }
-
-    const textoParaWhatsApp = textoMensaje.trim() 
-      ? textoMensaje 
-      : `Hola, vi tu producto "${producto.nombre}" en Moa Tradecenter y me interesa.`;
-    
-    const urlWhatsApp = `https://wa.me/${producto.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
-    window.open(urlWhatsApp, '_blank');
-
-    setUltimaAccion('mensaje');
-    setVista('exito');
-  };
-
-  const seleccionarPrestador = (p: Prestador) => {
-    setPrestadorSeleccionado(p);
-    setError(null);
-  };
-
-  const solicitarDomicilio = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    
-    if (!prestadorSeleccionado) {
-      setError('Selecciona un prestador de domicilio.');
-      return;
-    }
-
-    const textoParaWhatsApp = `Hola ${prestadorSeleccionado.nick}, necesito un domicilio para el producto "${producto.nombre}".`;
-    const urlWhatsApp = `https://wa.me/${prestadorSeleccionado.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(textoParaWhatsApp)}`;
-    window.open(urlWhatsApp, '_blank');
-
-    setUltimaAccion('domicilio');
-    setVista('exito');
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-[#2C2C2C]/60 flex items-center justify-center p-4 z-50"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-[20px] max-w-lg w-full max-h-[90vh] flex flex-col shadow-lg"
+    <div className="fixed inset-0 bg-[#2C2C2C]/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div 
+        className="bg-white rounded-[20px] max-w-xl w-full max-h-[90vh] flex flex-col shadow-[0_10px_40px_rgba(0,0,0,0.2)] relative" 
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER FIJO */}
-        <div className="p-6 border-b border-[#D9D4CC] relative flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[#2C2C2C] z-10 hover:bg-[#E8E2D9]"
-          >
-            ✕
-          </button>
-          <div className="mb-4">
-            <div className="h-48 bg-white/10 backdrop-blur-md border border-white/20 rounded-[14px] flex items-center justify-center overflow-hidden mb-2">
-              {fotoPrincipal ? (
-                <img src={fotoPrincipal} alt={producto.nombre} className="w-full h-full object-contain" />
-              ) : (
-                <span className="text-6xl text-[#D9D4CC]">📦</span>
+        <div className="p-6 border-b border-[#D9D4CC] flex justify-between items-center flex-shrink-0">
+          <h2 className="text-2xl font-extrabold text-[#2C2C2C]">
+            {productoAEditar ? 'Editar Producto' : 'Añadir Producto'}
+          </h2>
+          <button onClick={onClose} className="text-[#6B6B6B] hover:text-[#2C2C2C] font-bold text-xl">✕</button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-[#6B6B6B] mb-1">Nombre</label>
+              <input required type="text" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full px-3 py-2 rounded-[10px] border border-[#D9D4CC] focus:border-[#A63A2B] outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#6B6B6B] mb-1">Precio (CUP)</label>
+              <input required type="number" step="0.01" value={precio} onChange={e => setPrecio(e.target.value)} className="w-full px-3 py-2 rounded-[10px] border border-[#D9D4CC] focus:border-[#A63A2B] outline-none" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-[#6B6B6B] mb-1">Descripción</label>
+            <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} className="w-full px-3 py-2 rounded-[10px] border border-[#D9D4CC] focus:border-[#A63A2B] outline-none h-16 resize-none" />
+          </div>
+
+          {/* 🔥 SELECTOR DE CATEGORÍA CORREGIDO */}
+          <div>
+            <label className="block text-sm font-semibold text-[#6B6B6B] mb-1">Categoría del Producto</label>
+            <select 
+              value={categoriaId} 
+              onChange={e => setCategoriaId(e.target.value)} 
+              className="w-full px-3 py-2 rounded-[10px] border border-[#D9D4CC] focus:border-[#A63A2B] outline-none"
+            >
+              <option value="">-- Selecciona una categoría --</option>
+              {categorias.map(cat => (
+                <option key={cat._id} value={cat._id}>{cat.icono} {cat.nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-[10px] border border-[#D9D4CC]">
+            <h3 className="font-bold text-[#2C2C2C] mb-3">Variantes del producto (Opcional)</h3>
+            
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#6B6B6B] mb-1">Categoría (Tipo)</label>
+                <select value={categoria} onChange={e => {setCategoria(e.target.value); setTallaSeleccionada('');}} className="w-full px-2 py-2 rounded-[8px] border border-[#D9D4CC] text-sm">
+                  <option value="ropa">Ropa</option>
+                  <option value="calzado">Calzado</option>
+                  <option value="otro">Otro (sin talla)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B6B6B] mb-1">Público</label>
+                <select value={publico} onChange={e => {setPublico(e.target.value); setTallaSeleccionada('');}} className="w-full px-2 py-2 rounded-[8px] border border-[#D9D4CC] text-sm">
+                  <option value="mujer">Mujer</option>
+                  <option value="hombre">Hombre</option>
+                  <option value="niño">Niño</option>
+                  <option value="unisex">Unisex</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#6B6B6B] mb-1">Color</label>
+                <select value={colorSeleccionado} onChange={e => setColorSeleccionado(e.target.value)} className="w-full px-2 py-2 rounded-[8px] border border-[#D9D4CC] text-sm">
+                  {COLORES_DISPONIBLES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B6B6B] mb-1">Talla</label>
+                <select value={tallaSeleccionada} onChange={e => setTallaSeleccionada(e.target.value)} className="w-full px-2 py-2 rounded-[8px] border border-[#D9D4CC] text-sm">
+                  <option value="">-</option>
+                  {getTallas().map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#6B6B6B] mb-1">Cant.</label>
+                <input type="number" min="1" value={cantidad} onChange={e => setCantidad(e.target.value)} className="w-full px-2 py-2 rounded-[8px] border border-[#D9D4CC] text-sm" />
+              </div>
+              <div className="flex items-end">
+                <button type="button" onClick={handleAddVariante} className="w-full bg-[#4A7C59] hover:bg-[#355A40] text-white py-2 rounded-[8px] font-bold transition-colors">+</button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {variantes.map((v, i) => (
+                <div key={i} className="bg-white border border-[#D9D4CC] px-2 py-1 rounded text-xs flex items-center gap-2">
+                  <span>{v.color} - {v.talla} (x{v.cantidad})</span>
+                  <button type="button" onClick={() => removeVariante(i)} className="text-[#B83A2E] font-bold">✕</button>
+                </div>
+              ))}
+              {variantes.length === 0 && <span className="text-xs text-[#6B6B6B]">Opcional. Añade variantes si el producto tiene colores o tallas.</span>}
+            </div>
+          </div>
+
+          <div className="mt-2 border-t border-[#D9D4CC] pt-4">
+            <label className="block text-sm font-semibold text-[#2C2C2C] mb-2">Fotos del producto (Máx. 4)</label>
+            <div className="flex gap-2 flex-wrap mb-3">
+              {imagenesBase64.map((img, idx) => (
+                <div key={idx} className="relative w-16 h-16 rounded-[8px] overflow-hidden border border-[#D9D4CC] group">
+                  <img src={img} alt="preview" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => setImagenesBase64(prev => prev.filter((_, i) => i !== idx))} className="absolute inset-0 bg-black/50 text-white hidden group-hover:flex items-center justify-center font-bold">✕</button>
+                </div>
+              ))}
+              {imagenesBase64.length < 4 && (
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-[8px] border-2 border-dashed border-[#D9D4CC] flex items-center justify-center text-[#6B6B6B] hover:border-[#A63A2B] hover:text-[#A63A2B] transition-colors text-2xl">+</button>
               )}
             </div>
-            {tieneImagenes && producto.imagenes!.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {producto.imagenes!.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setImagenActiva(idx)}
-                    className={`w-12 h-12 rounded-[8px] overflow-hidden border-2 flex-shrink-0 ${imagenActiva === idx ? 'border-[#A63A2B]' : 'border-transparent'}`}
-                  >
-                    <img src={img} alt={`Vista ${idx + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
+            <input type="file" accept="image/*" multiple ref={fileInputRef} onChange={handleFileChange} className="hidden" />
           </div>
-          <h2 className="text-2xl font-extrabold text-[#2C2C2C] mb-1 pr-8">{producto.nombre}</h2>
-          <p className="text-[#6B6B6B] text-sm mb-3">{producto.descripcion}</p>
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-2xl font-extrabold text-[#A63A2B]">${precioFormateado}</span>
-              <span className="text-sm text-[#6B6B6B] ml-2">CUP</span>
-            </div>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${producto.tipoVenta === 'mayorista' ? 'bg-[#F0E6C8] text-[#8A6D1F]' : 'bg-[#E8D5C4] text-[#7A2A1F]'}`}>
-              {producto.tipoVenta === 'mayorista' ? 'Mayorista' : 'Minorista'}
-            </span>
-          </div>
-        </div>
-
-        {/* BODY CON SCROLL */}
-        <div className="p-6 overflow-y-auto flex-1">
-          {producto.variantes && producto.variantes.length > 0 && vista === null && (
-            <div className="mb-4">
-              <h3 className="text-sm font-bold text-[#2C2C2C] mb-2">Variantes disponibles:</h3>
-              <div className="flex flex-wrap gap-2">
-                {producto.variantes.map((v, i) => (
-                  <span key={i} className="bg-white/10 backdrop-blur-md border border-white/20 border border-[#D9D4CC] text-xs px-2 py-1 rounded-[6px] text-[#6B6B6B]">
-                    {v.color} - Talla {v.talla} <span className="text-[#4A7C59] font-bold">({v.cantidad} disp.)</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {vista === 'exito' && (
-            <div className="text-center py-6">
-              <div className="w-12 h-12 rounded-full bg-[#4A7C59]/10 flex items-center justify-center mx-auto mb-3 text-[#4A7C59] text-2xl">✓</div>
-              <h3 className="font-bold text-[#2C2C2C] mb-2">Operación realizada</h3>
-              <p className="text-[#6B6B6B] text-sm mb-4">
-                {ultimaAccion === 'mensaje' ? 'Se ha abierto WhatsApp con tu mensaje. Solo presiona "Enviar" allí para contactar al vendedor.' : 'Se ha abierto WhatsApp del prestador. Solo presiona "Enviar" allí para solicitar tu domicilio.'}
-              </p>
-              <button onClick={onClose} className="bg-[#A63A2B] hover:bg-[#7A2A1F] text-white px-6 py-2 rounded-[10px] font-bold">Cerrar</button>
-            </div>
-          )}
-
-          {vista === 'mensaje' && (
-            <form onSubmit={enviarMensaje} className="space-y-3">
-              <h3 className="text-base font-bold text-[#2C2C2C]">💬 Enviar mensaje al vendedor</h3>
-              {error && <p className="text-xs text-[#B83A2E]">{error}</p>}
-              <label className="block text-sm font-medium text-[#2C2C2C] mb-1">Mensaje (opcional)</label>
-              <textarea value={textoMensaje} onChange={(e) => setTextoMensaje(e.target.value)} placeholder="Tu consulta..." rows={2} className="w-full border border-[#D9D4CC] rounded-[8px] px-3 py-2 text-[#2C2C2C] focus:outline-none focus:border-[#A63A2B]" />
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setVista(null)} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Cancelar</button>
-                <button type="submit" className="flex-1 py-2 rounded-[10px] font-bold text-white bg-[#A63A2B] hover:bg-[#7A2A1F]">
-                  Abrir WhatsApp
-                </button>
-              </div>
-            </form>
-          )}
-
-          {vista === 'domicilio-whatsapp' && (
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#2C2C2C]">🛵 Solicitar domicilio</h3>
-              {error && <p className="text-xs text-[#B83A2E]">{error}</p>}
-              
-              <div className="border border-[#D9D4CC] rounded-[10px] p-3 bg-white/10 backdrop-blur-md border border-white/20/50">
-                <p className="text-xs font-bold text-[#2C2C2C] mb-2 uppercase tracking-wider">Elige un prestador de domicilio</p>
-                {prestadoresCargando ? (
-                  <p className="text-sm text-[#6B6B6B]">Cargando prestadores...</p>
-                ) : prestadores.length === 0 ? (
-                  <p className="text-sm text-[#6B6B6B]">No hay prestadores disponibles en este momento.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {prestadores.map((p) => (
-                      <button key={p._id} onClick={() => seleccionarPrestador(p)} disabled={!p.disponible} className={`w-full flex items-center justify-between p-2.5 rounded-[8px] border text-left transition ${prestadorSeleccionado?._id === p._id ? 'bg-[#FFEDD5] border-[#F97316]' : 'bg-white border-[#D9D4CC] hover:bg-white/10 backdrop-blur-md border border-white/20'}`}>
-                        <div>
-                          <span className="text-sm font-bold text-[#2C2C2C] block">{p.nick}</span>
-                          <span className="text-xs text-[#6B6B6B]">{p.disponible ? 'Disponible' : 'No disponible'} • Tarifa {(p.tarifaDomicilio / 100).toFixed(2)} CUP</span>
-                        </div>
-                        <span className="text-xs text-[#F97316] font-medium">{p.whatsapp}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => setVista(null)} className="flex-1 border border-[#D9D4CC] rounded-[10px] py-2 text-[#6B6B6B] font-medium">Volver</button>
-                <button onClick={solicitarDomicilio} disabled={!prestadorSeleccionado} className={`flex-1 py-2 rounded-[10px] font-bold text-white transition ${prestadorSeleccionado ? 'bg-[#F97316] hover:bg-[#EA580C]' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                  Abrir WhatsApp
-                </button>
-              </div>
-            </div>
-          )}
-
-          {vista === null && (
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <button onClick={abrirMensaje} className="bg-[#A63A2B] hover:bg-[#7A2A1F] text-white py-3 rounded-[10px] font-bold">💬 Mensaje</button>
-              <button onClick={abrirDomicilio} disabled={!producto.tieneDomicilio} className={`py-3 rounded-[10px] font-bold transition ${producto.tieneDomicilio ? 'bg-[#F97316] hover:bg-[#EA580C] text-white' : 'bg-[#D9D4CC] text-[#6B6B6B] cursor-not-allowed'}`}>
-                🛵 Domicilio
-              </button>
-            </div>
-          )}
-          {!producto.tieneDomicilio && vista === null && (
-            <p className="text-xs text-[#6B6B6B] text-center mt-2">Este producto no dispone de servicio de domicilio. Usa &quot;Mensaje&quot; para contactar al vendedor.</p>
-          )}
-        </div>
+          
+          <button disabled={cargando} type="submit" className="mt-2 bg-[#A63A2B] hover:bg-[#7A2A1F] text-white py-3 rounded-[10px] font-bold transition-colors disabled:opacity-50">
+            {cargando ? 'Guardando...' : (productoAEditar ? 'Actualizar Producto' : 'Guardar Producto')}
+          </button>
+        </form>
       </div>
     </div>
   );
