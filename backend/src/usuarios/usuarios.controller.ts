@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Patch, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Patch, Delete, Query } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { Usuario } from './usuarios.schema';
 
@@ -26,12 +26,18 @@ export class UsuariosController {
     return this.usuariosService.findAll();
   }
 
+  // 🔥 MODIFICADO: Ahora recibe page y limit
   @Get('prestadores')
-  findPrestadores() {
-    return this.usuariosService.findPrestadores();
+  findPrestadores(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usuariosService.findPrestadores(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 10
+    );
   }
 
-  // RUTA ESPECÍFICA: Negocios públicos (antes de @Get(':id'))
   @Get('negocios-publicos')
   findNegociosPublicos() {
     return this.usuariosService.findNegociosPublicos();

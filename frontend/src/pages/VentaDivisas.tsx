@@ -17,22 +17,42 @@ interface Divisa {
 export default function VentaDivisas() {
   const [divisas, setDivisas] = useState<Divisa[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [divisaSeleccionada, setDivisaSeleccionada] = useState<Divisa | null>(null);
 
-  useEffect(() => {
-    axios.get(`${API_URL}/servicios/divisas`)
-      .then(res => {
-        // 🔥 PARCHE: Aseguramos que sea un array
-        const data = Array.isArray(res.data) ? res.data : [];
+  // 🔥 Estados de paginación
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const cargarDivisas = async (pageNumber: number) => {
+    if (pageNumber === 1) setCargando(true);
+    else setCargandoMas(true);
+
+    try {
+      const res = await axios.get(`${API_URL}/servicios/divisas?page=${pageNumber}&limit=10`);
+      
+      // El backend ahora devuelve un objeto { data, total, page, totalPages }
+      const { data, totalPages } = res.data;
+
+      if (pageNumber === 1) {
         setDivisas(data);
-        setCargando(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setError('No se pudieron cargar las ofertas de divisas.');
-        setCargando(false);
-      });
+      } else {
+        setDivisas(prev => [...prev, ...data]);
+      }
+
+      setHasMore(pageNumber < totalPages);
+    } catch (err) {
+      console.error(err);
+      setError('No se pudieron cargar las ofertas de divisas.');
+    } finally {
+      setCargando(false);
+      setCargandoMas(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarDivisas(1);
   }, []);
 
   if (cargando) return <div className="text-center py-24 text-[#6B6B6B]">Cargando ofertas de divisas...</div>;
@@ -40,7 +60,7 @@ export default function VentaDivisas() {
 
   return (
     <div className="w-full min-h-screen bg-[#FAFAFA] pt-24 pb-12">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8">
         
         <div className="text-center mb-12">
           <span className="inline-block py-1 px-3 rounded-full bg-green-100 text-[#4A7C59] text-sm font-bold tracking-wider mb-4 shadow-sm">
@@ -60,11 +80,12 @@ export default function VentaDivisas() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          // 🔥 CAMBIO: Una sola columna
+          <div className="space-y-4">
             {divisas.map((divisa) => (
               <div 
                 key={divisa._id} 
-                className="bg-white rounded-[20px] border border-[#D9D4CC] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col relative overflow-hidden group"
+                className="bg-white rounded-[20px] border border-[#D9D4CC] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col relative overflow-hidden group w-full"
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#4A7C59]/10 to-transparent rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
 
@@ -101,6 +122,23 @@ export default function VentaDivisas() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 🔥 BOTÓN CARGAR MÁS */}
+        {hasMore && (
+          <div className="mt-8 text-center">
+            <button 
+              onClick={() => {
+                const nextPage = page + 1;
+                setPage(nextPage);
+                cargarDivisas(nextPage);
+              }}
+              disabled={cargandoMas}
+              className="bg-white text-[#4A7C59] border border-[#D9D4CC] px-8 py-3 rounded-full font-bold hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              {cargandoMas ? 'Cargando más...' : 'Cargar más divisas'}
+            </button>
           </div>
         )}
       </div>

@@ -38,61 +38,70 @@ export default function Servicios() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [vendedores, setVendedores] = useState<VendedorMap>({});
   const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
+
+  // 🔥 Estados de paginación
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   const [busqueda, setBusqueda] = useState('');
   const [busquedaVendedor, setBusquedaVendedor] = useState('');
   const [filtroOrden, setFiltroOrden] = useState('recientes');
   const [filtroCategoria, setFiltroCategoria] = useState('todas');
 
+  // 🔥 Función para cargar servicios (con paginación)
+  const cargarServicios = async (pageNumber: number) => {
+    if (pageNumber === 1) setCargando(true);
+    else setCargandoMas(true);
+
+    try {
+      const resServ = await axios.get(`${API_URL}/servicios?page=${pageNumber}&limit=10`);
+      const { data, totalPages } = resServ.data;
+
+      if (pageNumber === 1) {
+        setServicios(data);
+      } else {
+        setServicios(prev => [...prev, ...data]);
+      }
+
+      setHasMore(pageNumber < totalPages);
+    } catch (err) {
+      console.error(err);
+      setError('No se pudieron cargar los servicios.');
+    } finally {
+      setCargando(false);
+      setCargandoMas(false);
+    }
+  };
+
   useEffect(() => {
     Promise.all([
-      axios.get(`${API_URL}/servicios`),
       axios.get(`${API_URL}/categorias?tipo=servicio`),
       axios.get(`${API_URL}/usuarios`)
-    ])
-      .then(([resServ, resCat, resUsu]) => {
-        // 🔥 PARCHE: Aseguramos que todo sean arrays
-        const servData = Array.isArray(resServ.data) ? resServ.data : [];
-        const catData = Array.isArray(resCat.data) ? resCat.data : [];
-        const usuData = Array.isArray(resUsu.data) ? resUsu.data : [];
+    ]).then(([resCat, resUsu]) => {
+      const catData = Array.isArray(resCat.data) ? resCat.data : [];
+      setCategorias([...catData].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '')));
 
-        setServicios(servData);
+      const usuData = Array.isArray(resUsu.data) ? resUsu.data : [];
+      const vendedoresMap: VendedorMap = {};
+      usuData.forEach((u: any) => { if (u._id && u.nick) vendedoresMap[u._id] = u.nick; });
+      setVendedores(vendedoresMap);
 
-        const categoriasOrdenadas = [...catData].sort((a: Categoria, b: Categoria) => 
-          (a.nombre || '').localeCompare(b.nombre || '')
-        );
-        setCategorias(categoriasOrdenadas);
-
-        const vendedoresMap: VendedorMap = {};
-        usuData.forEach((u: any) => {
-          if (u._id && u.nick) {
-            vendedoresMap[u._id] = u.nick;
-          }
-        });
-        setVendedores(vendedoresMap);
-
-        setCargando(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError('No se pudieron cargar los datos.');
-        setCargando(false);
-      });
+      cargarServicios(1);
+    }).catch((err) => {
+      console.error(err);
+      setError('No se pudieron cargar los datos.');
+      setCargando(false);
+    });
   }, []);
 
   const serviciosFiltrados = useMemo(() => {
     let result = [...servicios];
-
-    // 🔥 Solo excluimos las divisas del directorio principal (los domicilios SÍ se muestran)
     result = result.filter(s => !s.esDivisa);
 
-    if (busqueda) {
-      result = result.filter(s => s.nombre.toLowerCase().includes(busqueda.toLowerCase()));
-    }
-
+    if (busqueda) result = result.filter(s => s.nombre.toLowerCase().includes(busqueda.toLowerCase()));
     if (busquedaVendedor) {
       const termino = busquedaVendedor.toLowerCase();
       result = result.filter(s => {
@@ -100,7 +109,6 @@ export default function Servicios() {
         return nickVendedor.toLowerCase().includes(termino);
       });
     }
-
     if (filtroCategoria !== 'todas') result = result.filter(s => s.categoriaId === filtroCategoria);
 
     if (filtroOrden === 'recientes') result.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -183,10 +191,28 @@ export default function Servicios() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              // 🔥 CAMBIO: Una sola columna con espacio vertical
+              <div className="space-y-4">
                 {serviciosFiltrados.map(serv => (
                   <ServicioCard key={serv._id} servicio={serv} onSelect={(s) => setServicioSeleccionado(s)} />
                 ))}
+              </div>
+            )}
+
+            {/* 🔥 BOTÓN CARGAR MÁS */}
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button 
+                  onClick={() => {
+                    const nextPage = page + 1;
+                    setPage(nextPage);
+                    cargarServicios(nextPage);
+                  }}
+                  disabled={cargandoMas}
+                  className="bg-white text-[#2E6B8A] border border-[#D9D4CC] px-8 py-3 rounded-full font-bold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  {cargandoMas ? 'Cargando más...' : 'Cargar más servicios'}
+                </button>
               </div>
             )}
           </div>

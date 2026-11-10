@@ -15,7 +15,12 @@ interface Prestador {
 export default function Prestadores() {
   const [prestadores, setPrestadores] = useState<Prestador[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 🔥 Estados de paginación
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   const [busqueda, setBusqueda] = useState('');
   const [filtroOrden, setFiltroOrden] = useState('tarifa-asc');
@@ -23,39 +28,39 @@ export default function Prestadores() {
 
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState<any | null>(null);
 
+  const cargarPrestadores = async (pageNumber: number) => {
+    if (pageNumber === 1) setCargando(true);
+    else setCargandoMas(true);
+
+    try {
+      const res = await axios.get(`${API_URL}/usuarios/prestadores?page=${pageNumber}&limit=10`);
+      const { data, totalPages } = res.data;
+
+      if (pageNumber === 1) setPrestadores(data);
+      else setPrestadores(prev => [...prev, ...data]);
+
+      setHasMore(pageNumber < totalPages);
+    } catch (err) {
+      console.error(err);
+      setError('No se pudieron cargar los prestadores.');
+    } finally {
+      setCargando(false);
+      setCargandoMas(false);
+    }
+  };
+
   useEffect(() => {
-    axios.get(`${API_URL}/usuarios/prestadores`)
-      .then((res) => {
-        // 🔥 PARCHE: Aseguramos que sea un array
-        const data = Array.isArray(res.data) ? res.data : [];
-        setPrestadores(data);
-        setCargando(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError('No se pudieron cargar los prestadores.');
-        setCargando(false);
-      });
+    cargarPrestadores(1);
   }, []);
 
   const prestadoresFiltrados = useMemo(() => {
     let result = [...prestadores];
+    if (busqueda) result = result.filter(p => p.nick.toLowerCase().includes(busqueda.toLowerCase()));
+    if (soloDisponibles) result = result.filter(p => p.disponible);
 
-    if (busqueda) {
-      result = result.filter(p => p.nick.toLowerCase().includes(busqueda.toLowerCase()));
-    }
-
-    if (soloDisponibles) {
-      result = result.filter(p => p.disponible);
-    }
-
-    if (filtroOrden === 'tarifa-asc') {
-      result.sort((a, b) => a.tarifaDomicilio - b.tarifaDomicilio);
-    } else if (filtroOrden === 'tarifa-desc') {
-      result.sort((a, b) => b.tarifaDomicilio - a.tarifaDomicilio);
-    } else if (filtroOrden === 'nombre') {
-      result.sort((a, b) => a.nick.localeCompare(b.nick));
-    }
+    if (filtroOrden === 'tarifa-asc') result.sort((a, b) => a.tarifaDomicilio - b.tarifaDomicilio);
+    else if (filtroOrden === 'tarifa-desc') result.sort((a, b) => b.tarifaDomicilio - a.tarifaDomicilio);
+    else if (filtroOrden === 'nombre') result.sort((a, b) => a.nick.localeCompare(b.nick));
 
     return result;
   }, [prestadores, busqueda, filtroOrden, soloDisponibles]);
@@ -78,7 +83,6 @@ export default function Prestadores() {
   return (
     <div className="w-full min-h-screen bg-[#FAFAFA] pt-24">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
         <div className="grid grid-cols-1 md:grid-cols-[256px_minmax(0,1fr)] gap-8 items-stretch">
           
           <aside className="w-full hidden md:block h-full">
@@ -87,13 +91,7 @@ export default function Prestadores() {
                 
                 <div className="bg-white p-5 rounded-[16px] border border-[#D9D4CC] shadow-sm">
                   <h3 className="font-bold text-[#2C2C2C] mb-4">Búsqueda</h3>
-                  <input 
-                    type="text" 
-                    placeholder="Buscar prestador..." 
-                    value={busqueda} 
-                    onChange={e => setBusqueda(e.target.value)} 
-                    className="w-full px-3 py-2.5 rounded-[10px] border border-[#D9D4CC] text-sm focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316] outline-none transition-all" 
-                  />
+                  <input type="text" placeholder="Buscar prestador..." value={busqueda} onChange={e => setBusqueda(e.target.value)} className="w-full px-3 py-2.5 rounded-[10px] border border-[#D9D4CC] text-sm focus:border-[#F97316] focus:ring-1 focus:ring-[#F97316] outline-none transition-all" />
                 </div>
 
                 <div className="bg-white p-5 rounded-[16px] border border-[#D9D4CC] shadow-sm">
@@ -132,10 +130,10 @@ export default function Prestadores() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              // 🔥 CAMBIO: Una sola columna
+              <div className="space-y-4">
                 {prestadoresFiltrados.map(p => (
-                  <div key={p._id} className="bg-white rounded-[20px] border border-[#D9D4CC] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
-                    
+                  <div key={p._id} className="bg-white rounded-[20px] border border-[#D9D4CC] p-6 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group w-full">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-full bg-[#F97316] text-white flex items-center justify-center font-extrabold text-lg shadow-md">
@@ -160,10 +158,7 @@ export default function Prestadores() {
                         <p className="text-xs text-[#6B6B6B] mb-0.5">Contacto público:</p>
                         <p className="font-bold text-[#2C2C2C] text-sm">{p.whatsapp}</p>
                       </div>
-                      <button 
-                        onClick={() => abrirModalContacto(p)}
-                        className="inline-flex items-center gap-2 bg-[#F97316] text-white px-4 py-2 rounded-[10px] text-sm font-bold hover:bg-[#EA580C] transition-colors shadow-sm"
-                      >
+                      <button onClick={() => abrirModalContacto(p)} className="inline-flex items-center gap-2 bg-[#F97316] text-white px-4 py-2 rounded-[10px] text-sm font-bold hover:bg-[#EA580C] transition-colors shadow-sm">
                         Contactar
                       </button>
                     </div>
@@ -171,16 +166,25 @@ export default function Prestadores() {
                 ))}
               </div>
             )}
+
+            {/* 🔥 BOTÓN CARGAR MÁS */}
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button 
+                  onClick={() => { const nextPage = page + 1; setPage(nextPage); cargarPrestadores(nextPage); }}
+                  disabled={cargandoMas}
+                  className="bg-white text-[#F97316] border border-[#D9D4CC] px-8 py-3 rounded-full font-bold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  {cargandoMas ? 'Cargando más...' : 'Cargar más prestadores'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {prestadorSeleccionado && (
-        <ModalServicio 
-          servicio={prestadorSeleccionado} 
-          onClose={() => setPrestadorSeleccionado(null)} 
-          tema="coral" 
-        />
+        <ModalServicio servicio={prestadorSeleccionado} onClose={() => setPrestadorSeleccionado(null)} tema="coral" />
       )}
     </div>
   );

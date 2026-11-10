@@ -14,14 +14,34 @@ export class ServiciosService {
     return servicio.save();
   }
 
-  // 🔥 MODIFICADO: Excluye las divisas por defecto
-  async findAll(vendedorId?: string): Promise<Servicio[]> {
-    const filter: any = vendedorId ? { vendedorId } : {};
-    
-    // Si no se pide específicamente, excluimos las divisas del catálogo general
-    filter.esDivisa = { $ne: true };
+  // 🔥 MODIFICADO: Paginación, filtro de 30 días y vendedorId opcional
+  async findAll(vendedorId?: string, page: number = 1, limit: number = 10): Promise<any> {
+    // Si hay vendedorId, es el panel del vendedor: le mostramos TODO su catálogo
+    if (vendedorId) {
+      const data = await this.servicioModel.find({ vendedorId }).sort({ createdAt: -1 }).exec();
+      return data; 
+    }
 
-    return this.servicioModel.find(filter).sort({ createdAt: -1 }).exec();
+    // Si no, es la página pública: Paginación + filtro de 30 días
+    const skip = (page - 1) * limit;
+    const hace30Dias = new Date();
+    hace30Dias.setDate(hace30Dias.getDate() - 30);
+
+    const filter = { 
+      updatedAt: { $gte: hace30Dias },
+      estado: 'activo',
+      esDivisa: { $ne: true } 
+    };
+
+    const total = await this.servicioModel.countDocuments(filter);
+    const data = await this.servicioModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   // 🔥 NUEVO: Método solo para el panel del vendedor (para que vea TODO su catálogo)
@@ -29,8 +49,20 @@ export class ServiciosService {
     return this.servicioModel.find({ vendedorId }).sort({ createdAt: -1 }).exec();
   }
 
-  async findDivisas(): Promise<Servicio[]> {
-    return this.servicioModel.find({ esDivisa: true, estado: 'activo' }).sort({ createdAt: -1 }).exec();
+  // 🔥 MODIFICADO: Paginación para divisas
+  async findDivisas(page: number = 1, limit: number = 10): Promise<any> {
+    const skip = (page - 1) * limit;
+    const filter = { esDivisa: true, estado: 'activo' };
+
+    const total = await this.servicioModel.countDocuments(filter);
+    const data = await this.servicioModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: string): Promise<Servicio> {

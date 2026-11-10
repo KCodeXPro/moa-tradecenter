@@ -20,18 +20,30 @@ export class ServiciosController {
     return this.serviciosService.create(createServicioDto);
   }
 
+  // 🔥 MODIFICADO: Ahora recibe page y limit
   @Get()
-  findAll(@Query('vendedorId') vendedorId?: string): Promise<Servicio[]> {
-    // 🔥 SI VIENE VENDEDORID (PANEL), MOSTRAMOS TODO. SI NO (CATÁLOGO), EXCLUIMOS DIVISAS.
-    if (vendedorId) {
-      return this.serviciosService.findAllByVendedor(vendedorId);
-    }
-    return this.serviciosService.findAll();
+  async findAll(
+    @Query('vendedorId') vendedorId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<any> {
+    return this.serviciosService.findAll(
+      vendedorId, 
+      page ? parseInt(page) : 1, 
+      limit ? parseInt(limit) : 10
+    );
   }
 
+  // 🔥 MODIFICADO: Ahora recibe page y limit
   @Get('divisas')
-  async getDivisas() {
-    return this.serviciosService.findDivisas();
+  async getDivisas(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.serviciosService.findDivisas(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 10
+    );
   }
 
   @Get(':id')

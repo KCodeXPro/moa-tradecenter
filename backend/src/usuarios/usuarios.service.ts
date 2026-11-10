@@ -223,15 +223,24 @@ export class UsuariosService {
     }
   }
 
-  async findPrestadores() {
-    return this.usuarioModel
-      .find({ esPrestador: true, estado: 'activo', disponible: true })
-      .select('nick whatsapp tarifaDomicilio disponible createdAt')
-      .sort({ createdAt: -1 })
+  // 🔥 NUEVO: Método paginado para prestadores
+  async findPrestadores(page: number = 1, limit: number = 10): Promise<any> {
+    const skip = (page - 1) * limit;
+    const filter = { esPrestador: true, estado: 'activo', disponible: true };
+
+    const total = await this.usuarioModel.countDocuments(filter);
+    const data = await this.usuarioModel
+      .find(filter)
+      .select('nick whatsapp tarifaDomicilio disponible') 
+      .sort({ nick: 1 }) 
+      .skip(skip)
+      .limit(limit)
       .exec();
+
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
-  // CORREGIDO: Consulta defensiva que filtra en memoria
+  // Consulta defensiva que filtra en memoria
   async findNegociosPublicos(): Promise<any[]> {
     try {
       const usuarios = await this.usuarioModel
@@ -239,7 +248,6 @@ export class UsuariosService {
         .select('nick ubicacion')
         .exec();
 
-      // Filtramos en memoria los que tienen esPublica: true y coordenadas
       return usuarios.filter(u => 
         u.ubicacion && 
         u.ubicacion.esPublica === true &&
