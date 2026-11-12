@@ -6,6 +6,8 @@ import ProductoCard from "./components/ProductoCard";
 import ServicioCard from "./components/ServicioCard";
 import ModalProducto from "./components/ModalProducto";
 
+const API_URL = import.meta.env.VITE_API_URL || '/api'; // 🔥 Aseguramos que use la URL correcta
+
 interface Producto {
   _id: string;
   vendedorId: string;
@@ -52,20 +54,26 @@ export default function Home() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('/api/productos'),
-      axios.get('/api/servicios')
+      axios.get(`${API_URL}/productos`),
+      axios.get(`${API_URL}/servicios`)
     ])
     .then(([resProductos, resServicios]) => {
-      const prodData = Array.isArray(resProductos.data) ? resProductos.data : [];
-      const servData = Array.isArray(resServicios.data) ? resServicios.data : [];
+      // 🔥 CORRECCIÓN: Extraemos el array del objeto paginado { data, total, ... }
+      const prodData = Array.isArray(resProductos.data) 
+        ? resProductos.data 
+        : (resProductos.data.data || []);
+        
+      const servData = Array.isArray(resServicios.data) 
+        ? resServicios.data 
+        : (resServicios.data.data || []);
 
       const productosOrdenados = [...prodData].sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
       setUltimosProductos(productosOrdenados.slice(0, 12));
       
       const serviciosOrdenados = [...servData].sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       );
       setUltimosServicios(serviciosOrdenados.slice(0, 8));
       
